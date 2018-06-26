@@ -264,7 +264,10 @@ public class Path {
             tmpNode = edgeBase.getBaseNode();
             // more efficient swap, currently not implemented for virtual edges: visitor.next(edgeBase.detach(true), i);
             edgeBase = graph.getEdgeIteratorState(edgeBase.getEdge(), tmpNode);
-            visitor.next(edgeBase, i, prevEdgeId);
+            // MARQ24 MOD START
+            //visitor.next(edgeBase, i, prevEdgeId);
+            visitor.next(edgeBase, i, len, prevEdgeId);
+            // MARQ24 MOD START
 
             prevEdgeId = edgeBase.getEdge();
         }
@@ -281,7 +284,10 @@ public class Path {
 
         forEveryEdge(new EdgeVisitor() {
             @Override
-            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            // MARQ24 MOD START
+            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
+            // MARQ24 MOD END
                 edges.add(eb);
             }
 
@@ -309,7 +315,10 @@ public class Path {
         nodes.add(tmpNode);
         forEveryEdge(new EdgeVisitor() {
             @Override
-            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            // MARQ24 MOD START
+            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
+            // MARQ24 MOD END
                 nodes.add(eb.getAdjNode());
             }
 
@@ -340,7 +349,10 @@ public class Path {
         points.add(nodeAccess, tmpNode);
         forEveryEdge(new EdgeVisitor() {
             @Override
-            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            // MARQ24 MOD END
+            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
+            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
+            // MARQ24 MOD END
                 PointList pl = eb.fetchWayGeometry(2);
                 for (int j = 0; j < pl.getSize(); j++) {
                     points.add(pl, j);
@@ -358,15 +370,22 @@ public class Path {
     /**
      * @return the list of instructions for this path.
      */
-    public InstructionList calcInstructions(final Translation tr) {
-        final InstructionList ways = new InstructionList(edgeIds.size() / 4, tr);
+    // MARQ24 MOD START
+    //public InstructionList calcInstructions(final Translation tr) {
+    public InstructionList calcInstructions(final PathProcessingContext procCntx) {
+        //final InstructionList ways = new InstructionList(edgeIds.size() / 4, tr);
+        final InstructionList ways = new InstructionList(edgeIds.size() / 4, procCntx.getTranslation());
+        // MARQ24 MOD END
         if (edgeIds.isEmpty()) {
             if (isFound()) {
                 ways.add(new FinishInstruction(nodeAccess, endNode));
             }
             return ways;
         }
-        forEveryEdge(new InstructionsFromEdges(getFromNode(), graph, weighting, encoder, nodeAccess, tr, ways));
+        // MARQ24 MOD START
+        //forEveryEdge(new InstructionsFromEdges(getFromNode(), graph, weighting, encoder, nodeAccess, tr, ways));
+        forEveryEdge(new InstructionsFromEdges(getFromNode(), graph, weighting, encoder, nodeAccess, procCntx, ways));
+        // MARQ24 MOD END
         return ways;
     }
 
@@ -416,8 +435,10 @@ public class Path {
      * The callback used in forEveryEdge.
      */
     public interface EdgeVisitor {
-        void next(EdgeIteratorState edge, int index, int prevEdgeId);
-
+        // MARQ24 MOD START
+        //void next(EdgeIteratorState edge, int index, int prevEdgeId);
+        void next(EdgeIteratorState edge, int index, int count, int prevEdgeId);
+        // MARQ24 MOD END
         void finish();
     }
 }

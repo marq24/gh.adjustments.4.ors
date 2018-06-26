@@ -38,7 +38,9 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
     private final FlagEncoder encoder;
     private final NodeAccess nodeAccess;
 
-    private final Translation tr;
+    // MARQ24 MOD START private final Translation tr;
+    private PathProcessingContext pathProcCntx;
+    // MARQ24 MOD END
     private final InstructionList ways;
     /*
      * We need three points to make directions
@@ -77,11 +79,17 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
 
     private final int MAX_U_TURN_DISTANCE = 35;
 
-    public InstructionsFromEdges(int tmpNode, Graph graph, Weighting weighting, FlagEncoder encoder, NodeAccess nodeAccess, Translation tr, InstructionList ways) {
+    // MARQ24 MOD START
+    //public InstructionsFromEdges(int tmpNode, Graph graph, Weighting weighting, FlagEncoder encoder, NodeAccess nodeAccess, Translation tr, InstructionList ways) {
+    public InstructionsFromEdges(int tmpNode, Graph graph, Weighting weighting, FlagEncoder encoder, NodeAccess nodeAccess, PathProcessingContext pathProcCntx, InstructionList ways) {
+    // MARQ24 MOD END
         this.weighting = weighting;
         this.encoder = encoder;
         this.nodeAccess = nodeAccess;
-        this.tr = tr;
+        // MARQ24 MOD START
+        //this.tr = tr;
+        this.pathProcCntx = pathProcCntx;
+        // MARQ24 MOD END
         this.ways = ways;
         prevLat = this.nodeAccess.getLatitude(tmpNode);
         prevLon = this.nodeAccess.getLongitude(tmpNode);
@@ -94,7 +102,10 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
 
 
     @Override
-    public void next(EdgeIteratorState edge, int index, int prevEdgeId) {
+    // MARQ24 MOD START
+    //public void next(EdgeIteratorState edge, int index, int prevEdgeId) {
+    public void next(EdgeIteratorState edge, int index, int count, int prevEdgeId) {
+    // MARQ24 MOD END
         // baseNode is the current node and adjNode is the next
         int adjNode = edge.getAdjNode();
         int baseNode = edge.getBaseNode();
@@ -117,7 +128,10 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
         }
 
         String name = edge.getName();
-        InstructionAnnotation annotation = encoder.getAnnotation(flags, tr);
+        // MARQ24 MOD START
+        //InstructionAnnotation annotation = encoder.getAnnotation(flags, tr);
+        InstructionAnnotation annotation = encoder.getAnnotation(flags, pathProcCntx.getTranslation());
+        // MARQ24 MOD END
 
         if ((prevName == null) && (!isRoundabout)) // very first instruction (if not in Roundabout)
         {
@@ -136,8 +150,7 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
             if (!prevInRoundabout) //just entered roundabout
             {
                 int sign = Instruction.USE_ROUNDABOUT;
-                RoundaboutInstruction roundaboutInstruction = new RoundaboutInstruction(sign, name,
-                        annotation, new PointList(10, nodeAccess.is3D()));
+                RoundaboutInstruction roundaboutInstruction = new RoundaboutInstruction(sign, name, annotation, new PointList(10, nodeAccess.is3D()));
                 prevInstructionPrevOrientation = prevOrientation;
                 if (prevName != null) {
                     // check if there is an exit at the same node the roundabout was entered
@@ -265,7 +278,10 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
             prevName = name;
         }
 
-        updatePointsAndInstruction(edge, wayGeo);
+        // MARQ24 MOD START
+        //updatePointsAndInstruction(edge, wayGeo);
+        updatePointsAndInstruction(edge, wayGeo,prevEdgeId);
+        // MARQ24 MOD END
 
         if (wayGeo.getSize() <= 2) {
             doublePrevLat = prevLat;
@@ -281,6 +297,14 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
         prevLat = adjLat;
         prevLon = adjLon;
         prevEdge = edge;
+
+        // MARQ24 MOD START
+        // Modification by Maxim Rylov
+        boolean lastEdge = index == count - 1;
+        if (pathProcCntx.getPathProcessor() != null) {
+            pathProcCntx.getPathProcessor().processEdge(pathProcCntx.getPathIndex(), edge, lastEdge, wayGeo);
+        }
+        // MARQ24 MOD END
     }
 
     @Override
@@ -411,7 +435,10 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
         return Instruction.IGNORE;
     }
 
-    private void updatePointsAndInstruction(EdgeIteratorState edge, PointList pl) {
+    // MARQ24 MOD START [NEED TO BE REVISED IF NEEDED!!!]
+    //private void updatePointsAndInstruction(EdgeIteratorState edge, PointList pl) {
+    private void updatePointsAndInstruction(EdgeIteratorState edge, PointList pl, int prevEdgeId) {
+    // MARQ24 MOD END [NEED TO BE REVISED IF NEEDED!!!]
         // skip adjNode
         int len = pl.size() - 1;
         for (int i = 0; i < len; i++) {
@@ -419,8 +446,11 @@ public class InstructionsFromEdges implements Path.EdgeVisitor {
         }
         double newDist = edge.getDistance();
         prevInstruction.setDistance(newDist + prevInstruction.getDistance());
-        prevInstruction.setTime(weighting.calcMillis(edge, false, EdgeIterator.NO_EDGE)
-                + prevInstruction.getTime());
+
+        //MARQ24 MOD START [NEED TO BE REVISED IF NEEDED!!!]
+        //prevInstruction.setTime(weighting.calcMillis(edge, false, EdgeIterator.NO_EDGE) + prevInstruction.getTime());
+        prevInstruction.setTime(weighting.calcMillis(edge, false, prevEdgeId) + prevInstruction.getTime());
+        //MARQ24 MOD END [NEED TO BE REVISED IF NEEDED!!!]
     }
 
 }

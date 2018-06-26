@@ -419,6 +419,12 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation imple
         return prepareGraph.getWeighting();
     }
 
+    // MARQ24 MOD START ADDED (exposed prepareWeighting)
+    public Weighting getPrepareWeighting() {
+        return prepareWeighting;
+    }
+    // MARQ24 MOD END
+
     private String getTimesAsString() {
         return "t(dijk):" + Helper.round2(dijkstraTime)
                 + ", t(period):" + Helper.round2(periodTime)

@@ -40,11 +40,16 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
     static final int SLOW_SPEED = 2;
     static final int MEAN_SPEED = 5;
     static final int FERRY_SPEED = 15;
-    final Set<String> safeHighwayTags = new HashSet<String>();
-    final Set<String> allowedHighwayTags = new HashSet<String>();
-    final Set<String> avoidHighwayTags = new HashSet<String>();
+
+    // MARQ24 MOD START
+    // added 'protected'
+    protected final Set<String> safeHighwayTags = new HashSet<String>();
+    protected final Set<String> allowedHighwayTags = new HashSet<String>();
+    protected final Set<String> avoidHighwayTags = new HashSet<String>();
     // convert network tag of hiking routes into a way route code
-    final Map<String, Integer> hikingNetworkToCode = new HashMap<String, Integer>();
+    protected final Map<String, Integer> hikingNetworkToCode = new HashMap<String, Integer>();
+    // MARQ24 MOD END
+
     protected HashSet<String> sidewalkValues = new HashSet<String>(5);
     protected HashSet<String> sidewalksNoValues = new HashSet<String>(5);
     private EncodedValue priorityWayEncoder;
@@ -341,7 +346,10 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
      * @param weightToPrioMap associate a weight with every priority. This sorted map allows
      *                        subclasses to 'insert' more important priorities as well as overwrite determined priorities.
      */
-    void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
+    // MARQ24 MOD START(added modifier protected)
+    //void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
+    protected void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
+    // MARQ24 MOD END
         String highway = way.getTag("highway");
         if (way.hasTag("foot", "designated"))
             weightToPrioMap.put(100d, PREFER.getValue());

@@ -90,6 +90,11 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
 
     private ConditionalTagInspector conditionalTagInspector;
 
+    // MARQ24 MOD START - Modification by Maxim Rylov: Added new class members.
+    private boolean considerElevation = false;
+    protected EncodedDoubleValue reverseSpeedEncoder;
+    // MARQ24 MOD END
+
     public AbstractFlagEncoder(PMap properties) {
         throw new RuntimeException("This method must be overridden in derived classes");
     }
@@ -118,6 +123,16 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
         ferries.add("ferry");
     }
 
+    // MARQ24 MOD START
+    public void setConsiderElevation(boolean considerElevation) {
+        this.considerElevation = considerElevation;
+    }
+
+    public boolean isConsiderElevation() {
+        return considerElevation;
+    }
+    // MARQ24 MOD END
+
     // should be called as last method in constructor, move out of the flag encoder somehow
     protected void init() {
         // we should move 'OSM to object' logic into the DataReader like OSMReader, but this is a major task as we need to convert OSM format into kind of a standard/generic format
@@ -139,6 +154,12 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     public void setBlockByDefault(boolean blockByDefault) {
         this.blockByDefault = blockByDefault;
     }
+
+    // MARQ24 MOD START
+    public boolean isBlockByDefault() {
+        return blockByDefault;
+    }
+    // MARQ24 MOD END
 
     public boolean isBlockFords() {
         return blockFords;
@@ -273,19 +294,46 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
      * mind that this method is performance critical!
      */
     public long reverseFlags(long flags) {
-        long dir = flags & directionBitMask;
-        if (dir == directionBitMask || dir == 0)
-            return flags;
+        // MARQ24 MOD START
+        if (considerElevation) {
+            long dir = flags & directionBitMask;
+            if (dir == directionBitMask || dir == 0) {
 
-        return flags ^ directionBitMask;
+            } else {
+                flags = flags ^ directionBitMask;
+            }
+            // swap speeds
+            double otherValue = reverseSpeedEncoder.getDoubleValue(flags);
+            flags = setReverseSpeed(flags, speedEncoder.getDoubleValue(flags));
+            return setSpeed(flags, otherValue);
+        } else {
+        // MARQ24 MOD END
+            long dir = flags & directionBitMask;
+            if (dir == directionBitMask || dir == 0)
+                return flags;
+
+            return flags ^ directionBitMask;
+        // MARQ24 MOD START
+        }
+        // MARQ24 MOD END
     }
 
     /**
      * Sets default flags with specified access.
      */
     public long flagsDefault(boolean forward, boolean backward) {
-        long flags = speedEncoder.setDefaultValue(0);
-        return setAccess(flags, forward, backward);
+        // MARQ24 MOD START
+        if (isConsiderElevation() && backward) {
+            long flags = speedEncoder.setDefaultValue(0);
+            flags = setAccess(flags, forward, backward);
+            return reverseSpeedEncoder.setDefaultValue(flags);
+        } else {
+        // MARQ24 MOD END
+            long flags = speedEncoder.setDefaultValue(0);
+            return setAccess(flags, forward, backward);
+        // MARQ24 MOD START
+        }
+        // MARQ24 MOD END
     }
 
     @Override
@@ -309,6 +357,11 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     }
 
     protected long setLowSpeed(long flags, double speed, boolean reverse) {
+        // MARQ24 MOD START
+        if (reverse && isConsiderElevation()) {
+            return setBool(reverseSpeedEncoder.setDoubleValue(flags, 0), K_BACKWARD, false);
+        }
+        // MARQ24 MOD END
         return setAccess(speedEncoder.setDoubleValue(flags, 0), false, false);
     }
 
@@ -323,12 +376,38 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
 
     @Override
     public long setReverseSpeed(long flags, double speed) {
-        return setSpeed(flags, speed);
+        // MARQ24 MOD START
+        if (considerElevation) {
+            if (speed < 0 || Double.isNaN(speed)) {
+                throw new IllegalArgumentException("Speed cannot be negative: " + speed + ", flags:" + BitUtil.LITTLE.toBitString(flags));
+            }
+            if (speed < speedEncoder.factor / 2) {
+                return setLowSpeed(flags, speed, true);
+            }
+            if (speed > getMaxSpeed()) {
+                speed = getMaxSpeed();
+            }
+            return reverseSpeedEncoder.setDoubleValue(flags, speed);
+        } else {
+        // MARQ24 MOD END
+            return setSpeed(flags, speed);
+        // MARQ24 MOD START
+        }
+        // MARQ24 MOD END
     }
 
     @Override
     public double getReverseSpeed(long flags) {
-        return getSpeed(flags);
+        // MARQ24 MOD START
+        if (considerElevation) {
+            return reverseSpeedEncoder.getDoubleValue(flags);
+        }
+        else {
+        // MARQ24 MOD END
+            return getSpeed(flags);
+        // MARQ24 MOD START
+        }
+        // MARQ24 MOD END
     }
 
     @Override
@@ -344,7 +423,10 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     /**
      * @return -1 if no maxspeed found
      */
-    protected double getMaxSpeed(ReaderWay way) {
+    // MARQ24 MOD START
+    //protected double getMaxSpeed(ReaderWay way) {
+    public double getMaxSpeed(ReaderWay way) {
+    // MARQ24 MOD END
         double maxSpeed = parseSpeed(way.getTag("maxspeed"));
         double fwdSpeed = parseSpeed(way.getTag("maxspeed:forward"));
         if (fwdSpeed >= 0 && (maxSpeed < 0 || fwdSpeed < maxSpeed))

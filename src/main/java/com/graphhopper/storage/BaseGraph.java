@@ -1168,6 +1168,13 @@ class BaseGraph implements Graph {
             return edgeId;
         }
 
+        // MARQ24 MOD START
+        @Override
+        public int getOriginalEdge() {
+            return edgeId;
+        }
+        // MARQ24 MOD END
+
         @Override
         public String getName() {
             int nameIndexRef = baseGraph.edges.getInt(edgePointer + baseGraph.E_NAME);

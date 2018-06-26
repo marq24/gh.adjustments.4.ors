@@ -17,11 +17,8 @@
  */
 package com.graphhopper.reader;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  * Base class for all network objects
@@ -49,6 +46,18 @@ public abstract class ReaderElement {
         properties = new HashMap<>(propertyMapSize);
     }
 
+    // MARQ24 MOD START
+    // Modification by Maxim Rylov: A new method has been added.
+    public boolean hasTag(String key) {
+        return properties.containsKey(key);
+    }
+
+    // Modification by Maxim Rylov: A new method has been added.
+    public Iterator<Entry<String, Object>> getProperties() {
+        return properties.entrySet().iterator();
+    }
+    // MARQ24 MOD END
+
     public long getId() {
         return id;
     }
@@ -67,7 +76,10 @@ public abstract class ReaderElement {
         return tagTxt.toString();
     }
 
-    protected Map<String, Object> getTags() {
+    // MARQ24 MOD START
+    //protected Map<String, Object> getTags()
+    public Map<String, Object> getTags() {
+    // MARQ24 MOD END
         return properties;
     }
 
