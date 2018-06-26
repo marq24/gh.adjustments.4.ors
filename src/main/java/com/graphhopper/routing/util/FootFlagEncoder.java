@@ -39,17 +39,12 @@ import static com.graphhopper.routing.util.PriorityCode.*;
 public class FootFlagEncoder extends AbstractFlagEncoder {
     static final int SLOW_SPEED = 2;
     static final int MEAN_SPEED = 5;
-    static final int FERRY_SPEED = 10;
-
-    // MARQ24 MOD START
-    // added 'protected'
-    protected final Set<String> safeHighwayTags = new HashSet<String>();
-    protected final Set<String> allowedHighwayTags = new HashSet<String>();
-    protected final Set<String> avoidHighwayTags = new HashSet<String>();
+    static final int FERRY_SPEED = 15;
+    final Set<String> safeHighwayTags = new HashSet<String>();
+    final Set<String> allowedHighwayTags = new HashSet<String>();
+    final Set<String> avoidHighwayTags = new HashSet<String>();
     // convert network tag of hiking routes into a way route code
-    protected final Map<String, Integer> hikingNetworkToCode = new HashMap<String, Integer>();
-    // MARQ24 MOD END
-
+    final Map<String, Integer> hikingNetworkToCode = new HashMap<String, Integer>();
     protected HashSet<String> sidewalkValues = new HashSet<String>(5);
     protected HashSet<String> sidewalksNoValues = new HashSet<String>(5);
     private EncodedValue priorityWayEncoder;
@@ -140,7 +135,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
 
     @Override
     public int getVersion() {
-        return 3;
+        return 4;
     }
 
     @Override
@@ -205,15 +200,26 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
     public long acceptWay(ReaderWay way) {
         String highwayValue = way.getTag("highway");
         if (highwayValue == null) {
+            long acceptPotentially = 0;
+
             if (way.hasTag("route", ferries)) {
                 String footTag = way.getTag("foot");
                 if (footTag == null || "yes".equals(footTag))
-                    return acceptBit | ferryBit;
+                    acceptPotentially = acceptBit | ferryBit;
             }
 
             // special case not for all acceptedRailways, only platform
             if (way.hasTag("railway", "platform"))
-                return acceptBit;
+                acceptPotentially = acceptBit;
+
+            if (way.hasTag("man_made", "pier"))
+                acceptPotentially = acceptBit;
+
+            if (acceptPotentially != 0) {
+                if (way.hasTag(restrictions, restrictedValues) && !getConditionalTagInspector().isRestrictedWayConditionallyPermitted(way))
+                    return 0;
+                return acceptPotentially;
+            }
 
             return 0;
         }
@@ -229,7 +235,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
         // no need to evaluate ferries or fords - already included here
         if (way.hasTag("foot", intendedValues))
             return acceptBit;
-        
+
         // check access restrictions
         if (way.hasTag(restrictions, restrictedValues) && !getConditionalTagInspector().isRestrictedWayConditionallyPermitted(way))
             return 0;
@@ -290,12 +296,12 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
             }
             flags |= directionBitMask;
 
-            boolean isRoundabout = way.hasTag("junction", "roundabout");
+            boolean isRoundabout = way.hasTag("junction", "roundabout") || way.hasTag("junction", "circular");
             if (isRoundabout)
                 flags = setBool(flags, K_ROUNDABOUT, true);
 
         } else {
-            double ferrySpeed = getFerrySpeed(way, SLOW_SPEED, MEAN_SPEED, FERRY_SPEED);
+            double ferrySpeed = getFerrySpeed(way);
             flags = setSpeed(flags, ferrySpeed);
             flags |= directionBitMask;
         }
@@ -335,9 +341,7 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
      * @param weightToPrioMap associate a weight with every priority. This sorted map allows
      *                        subclasses to 'insert' more important priorities as well as overwrite determined priorities.
      */
-    // MARQ24 MOD START(added modifier protected)
-    //void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
-    protected void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
+    void collect(ReaderWay way, TreeMap<Double, Integer> weightToPrioMap) {
         String highway = way.getTag("highway");
         if (way.hasTag("foot", "designated"))
             weightToPrioMap.put(100d, PREFER.getValue());
@@ -371,5 +375,18 @@ public class FootFlagEncoder extends AbstractFlagEncoder {
     @Override
     public String toString() {
         return "foot";
+    }
+
+    /*
+     * This method is a current hack, to allow ferries to be actually faster than our current storable maxSpeed.
+     */
+    @Override
+    public double getSpeed(long flags) {
+        double speed = super.getSpeed(flags);
+        if (speed == getMaxSpeed()) {
+            // We cannot be sure if it was a long or a short trip
+            return SHORT_TRIP_FERRY_SPEED;
+        }
+        return speed;
     }
 }

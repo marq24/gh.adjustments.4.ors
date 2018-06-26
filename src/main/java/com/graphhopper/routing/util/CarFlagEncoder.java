@@ -47,9 +47,6 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
      */
     protected final Map<String, Integer> defaultSpeedMap = new HashMap<String, Integer>();
 
-    // MARQ24 ADDED
-    protected int maxTrackGradeLevel = 3;
-
     public CarFlagEncoder() {
         this(5, 5, 0);
     }
@@ -61,10 +58,6 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
         this.properties = properties;
         this.setBlockFords(properties.getBool("block_fords", true));
         this.setBlockByDefault(properties.getBool("block_barriers", true));
-
-        // MARQ24 MOD START
-        maxTrackGradeLevel = properties.getInt("maximum_grade_level", 3);
-        // MARQ24 MOD END
     }
 
     public CarFlagEncoder(String propertiesStr) {
@@ -175,14 +168,6 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
             highwayValue = "motorroad";
         }
         Integer speed = defaultSpeedMap.get(highwayValue);
-
-        // MARQ24 MOD START
-        int maxSpeed = (int) Math.round(getMaxSpeed(way)); // Modification by Maxim Rylov
-        if (maxSpeed > 0) {
-            speed = maxSpeed;
-        }
-        // MARQ24 MOD END
-
         if (speed == null)
             throw new IllegalStateException(toString() + ", no speed found for: " + highwayValue + ", tags: " + way);
 
@@ -194,15 +179,6 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
                     speed = tInt;
             }
         }
-
-        // MARQ24 MOD START
-        if (way.hasTag("access")) // // Modification by Maxim Rylov: see https://www.openstreetmap.org/way/132312559
-        {
-            String accessTag = way.getTag("access");
-            if ("destination".equals(accessTag))
-                return 1;
-        }
-        // MARQ24 MOD END
 
         return speed;
     }
@@ -226,19 +202,8 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
 
         if ("track".equals(highwayValue)) {
             String tt = way.getTag("tracktype");
-            // MARQ24 MOD START
-            // ORG START
-            /*if (tt != null && !tt.equals("grade1") && !tt.equals("grade2") && !tt.equals("grade3")) {
+            if (tt != null && !tt.equals("grade1") && !tt.equals("grade2") && !tt.equals("grade3"))
                 return 0;
-            }*/
-            //ORG END
-            if (tt != null) {
-                int grade = getTrackGradeLevel(tt);
-                if (grade > maxTrackGradeLevel) {
-                    return 0;
-                }
-            }
-            // MARQ24 MOD END
         }
 
         if (!defaultSpeedMap.containsKey(highwayValue))
@@ -259,25 +224,11 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
         if (isBlockFords() && ("ford".equals(highwayValue) || way.hasTag("ford")))
             return 0;
 
-        // MARQ24 MOD START
-        String maxwidth = way.getTag("maxwidth"); // Modification by Maxim Rylov
-        if (maxwidth != null) {
-            try {
-                double mwv = Double.parseDouble(maxwidth);
-                if (mwv < 2.0)
-                    return 0;
-            } catch (Exception ex) {
-
-            }
-        }
-        // MARQ24 MOD END
-
         if (getConditionalTagInspector().isPermittedWayConditionallyRestricted(way))
             return 0;
         else
             return acceptBit;
     }
-
 
     @Override
     public long handleRelationTags(ReaderRelation relation, long oldRelationFlags) {
@@ -297,36 +248,11 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
 
             speed = applyBadSurfaceSpeed(way, speed);
 
-            // MARQ24 MOD START
-            // ORG CODE START
-            //flags = setSpeed(flags, speed);
-            //boolean isRoundabout = way.hasTag("junction", "roundabout");
-            // ORG CODE END
-            boolean isRoundabout = way.hasTag("junction", "roundabout");
-
-            if (isRoundabout){
-                //http://www.sidrasolutions.com/Documents/OArndt_Speed%20Control%20at%20Roundabouts_23rdARRBConf.pdf
-                if (way.hasTag("highway", "mini_roundabout"))
-                    speed = speed < 25 ? speed : 25;
-
-                if (way.hasTag("lanes")) {
-                    try {
-                        // The following line throws exceptions when it tries to parse a value "3; 2"
-                        int lanes = Integer.parseInt(way.getTag("lanes"));
-                        if (lanes >= 2) {
-                            speed = speed < 40 ? speed : 40;
-                        }else {
-                            speed = speed < 35 ? speed : 35;
-                        }
-                    } catch (Exception ex) { }
-                }
-            }
             flags = setSpeed(flags, speed);
-            // MARQ24 MOD END
 
-            if (isRoundabout) {
+            boolean isRoundabout = way.hasTag("junction", "roundabout") || way.hasTag("junction", "circular");
+            if (isRoundabout)
                 flags = setBool(flags, K_ROUNDABOUT, true);
-            }
 
             if (isOneway(way) || isRoundabout) {
                 if (isBackwardOneway(way))
@@ -338,7 +264,7 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
                 flags |= directionBitMask;
 
         } else {
-            double ferrySpeed = getFerrySpeed(way, defaultSpeedMap.get("living_street"), defaultSpeedMap.get("service"), defaultSpeedMap.get("residential"));
+            double ferrySpeed = getFerrySpeed(way);
             flags = setSpeed(flags, ferrySpeed);
             flags |= directionBitMask;
         }
@@ -346,7 +272,7 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
         for (String restriction : restrictions) {
             if (way.hasTag(restriction, "destination")) {
                 // This is problematic as Speed != Time
-                flags = this.speedEncoder.setDoubleValue(flags, destinationSpeed);
+                flags = setSpeed(flags, destinationSpeed);
             }
         }
 
@@ -409,8 +335,8 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
     }
 
     /**
-     * @param way:   needed to retrieve tags
-     * @param speed: speed guessed e.g. from the road type or other tags
+     * @param way   needed to retrieve tags
+     * @param speed speed guessed e.g. from the road type or other tags
      * @return The assumed speed
      */
     protected double applyBadSurfaceSpeed(ReaderWay way, double speed) {
@@ -419,48 +345,6 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
             speed = badSurfaceSpeed;
         return speed;
     }
-
-    // MARQ24 MOD START
-    protected int getTrackGradeLevel(String grade) {
-        if (grade == null)
-            return 0;
-
-        if (grade.contains(";")) // grade3;grade2
-        {
-            int maxGrade = 0;
-
-            try {
-                String[] values = grade.split(";");
-                for (String v : values) {
-                    int iv = Integer.parseInt(v.replace("grade", "").trim());
-                    if (iv > maxGrade)
-                        maxGrade = iv;
-                }
-
-                return maxGrade;
-            } catch (Exception ex) {
-            }
-        }
-
-        switch (grade) {
-            case "grade":
-            case "grade1":
-                return 1;
-            case "grade2":
-                return 2;
-            case "grade3":
-                return 3;
-            case "grade4":
-                return 4;
-            case "grade5":
-                return 5;
-            case "grade6":
-                return 6;
-        }
-
-        return 10;
-    }
-    // MARQ24 MOD END
 
     @Override
     public String toString() {

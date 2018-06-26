@@ -42,8 +42,8 @@ public class DijkstraBidirectionRef extends AbstractBidirAlgo {
     protected SPTEntry currFrom;
     protected SPTEntry currTo;
     protected PathBidirRef bestPath;
-    private PriorityQueue<SPTEntry> pqOpenSetFrom;
-    private PriorityQueue<SPTEntry> pqOpenSetTo;
+    PriorityQueue<SPTEntry> pqOpenSetFrom;
+    PriorityQueue<SPTEntry> pqOpenSetTo;
     private boolean updateBestPath = true;
 
     public DijkstraBidirectionRef(Graph graph, Weighting weighting, TraversalMode tMode) {
@@ -165,24 +165,12 @@ public class DijkstraBidirectionRef extends AbstractBidirAlgo {
                 continue;
 
             int traversalId = traversalMode.createTraversalId(iter, reverse);
-
-            // MARQ24 MOD START
-            //double tmpWeight = weighting.calcWeight(iter, reverse, currEdge.edge) + currEdge.weight;
-            // Modification by Maxim Rylov: use originalEdge as the previousEdgeId
-            double tmpWeight = weighting.calcWeight(iter, reverse, currEdge.originalEdge) + currEdge.weight;
-            // MARQ24 MOD END
-
+            double tmpWeight = weighting.calcWeight(iter, reverse, currEdge.edge) + currEdge.weight;
             if (Double.isInfinite(tmpWeight))
                 continue;
             SPTEntry ee = bestWeightMap.get(traversalId);
             if (ee == null) {
                 ee = new SPTEntry(iter.getEdge(), iter.getAdjNode(), tmpWeight);
-
-                // MARQ24 MOD START
-                // Modification by Maxim Rylov: Assign the original edge id.
-                ee.originalEdge = iter.getOriginalEdge();
-                // MARQ24 MOD END
-
                 ee.parent = currEdge;
                 bestWeightMap.put(traversalId, ee);
                 prioQueue.add(ee);

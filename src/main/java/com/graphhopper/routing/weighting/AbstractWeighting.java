@@ -20,36 +20,22 @@ package com.graphhopper.routing.weighting;
 import com.graphhopper.routing.util.FlagEncoder;
 import com.graphhopper.routing.util.HintsMap;
 import com.graphhopper.util.EdgeIteratorState;
-import com.graphhopper.util.PMap;
+
+import static com.graphhopper.util.Helper.toLowerCase;
 
 /**
  * @author Peter Karich
  */
 public abstract class AbstractWeighting implements Weighting {
     protected final FlagEncoder flagEncoder;
-    // MARQ24 - ADDED - Modification by Maxim Rylov
-    protected double userMaxSpeed = -1;
 
     protected AbstractWeighting(FlagEncoder encoder) {
-        this(encoder, null);
-    }
-
-    // MARQ24 MOD START - ADDED CONSTRUCTOR with MAP...
-    protected AbstractWeighting(FlagEncoder encoder, PMap map) {
         this.flagEncoder = encoder;
-        if (!flagEncoder.isRegistered()) {
+        if (!flagEncoder.isRegistered())
             throw new IllegalStateException("Make sure you add the FlagEncoder " + flagEncoder + " to an EncodingManager before using it elsewhere");
-        }
-        if (!isValidName(getName())) {
+        if (!isValidName(getName()))
             throw new IllegalStateException("Not a valid name for a Weighting: " + getName());
-        }
-        // MARQ24 THIS IS THE ADDON START
-        if (map != null) {
-            userMaxSpeed = map.getDouble("max_speed", -1);
-        }
-        // MARQ24 THIS IS THE ADDON END
     }
-    // MARQ24 MOD END
 
     @Override
     public long calcMillis(EdgeIteratorState edgeState, boolean reverse, int prevOrNextEdgeId) {
@@ -65,13 +51,6 @@ public abstract class AbstractWeighting implements Weighting {
         if (speed == 0)
             throw new IllegalStateException("Speed cannot be 0 for unblocked edge, use access properties to mark edge blocked! Should only occur for shortest path calculation. See #242.");
 
-
-        // MARQ24 MOD START
-        if (userMaxSpeed > 0) {
-            if (speed > userMaxSpeed)
-                speed = userMaxSpeed;
-        }
-        // MARQ24 MOD END
         return (long) (edgeState.getDistance() * 3600 / speed);
     }
 
@@ -114,7 +93,7 @@ public abstract class AbstractWeighting implements Weighting {
      * Replaces all characters which are not numbers, characters or underscores with underscores
      */
     public static String weightingToFileName(Weighting w) {
-        return w.toString().toLowerCase().replaceAll("\\|", "_");
+        return toLowerCase(w.toString()).replaceAll("\\|", "_");
     }
 
     @Override

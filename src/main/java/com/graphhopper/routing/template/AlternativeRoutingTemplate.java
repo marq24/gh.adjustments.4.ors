@@ -20,13 +20,17 @@ package com.graphhopper.routing.template;
 import com.graphhopper.GHRequest;
 import com.graphhopper.GHResponse;
 import com.graphhopper.PathWrapper;
-import com.graphhopper.routing.*;
+import com.graphhopper.routing.AlgorithmOptions;
+import com.graphhopper.routing.Path;
+import com.graphhopper.routing.QueryGraph;
+import com.graphhopper.routing.RoutingAlgorithmFactory;
 import com.graphhopper.routing.util.FlagEncoder;
 import com.graphhopper.storage.index.LocationIndex;
 import com.graphhopper.storage.index.QueryResult;
 import com.graphhopper.util.Parameters.Routing;
 import com.graphhopper.util.PathMerger;
 import com.graphhopper.util.PointList;
+import com.graphhopper.util.Translation;
 import com.graphhopper.util.shapes.GHPoint;
 
 import java.util.Collections;
@@ -45,14 +49,11 @@ final public class AlternativeRoutingTemplate extends ViaRoutingTemplate {
     }
 
     @Override
-    // MARQ24 MOD START
-    //public List<QueryResult> lookup(List<GHPoint> points, FlagEncoder encoder) {
-    public List<QueryResult> lookup(List<GHPoint> points, double[] radiuses, FlagEncoder encoder) {
-    // MARQ24 MOD END
-        if (points.size() > 2) {
+    public List<QueryResult> lookup(List<GHPoint> points, FlagEncoder encoder) {
+        if (points.size() > 2)
             throw new IllegalArgumentException("Currently alternative routes work only with start and end point. You tried to use: " + points.size() + " points");
-        }
-        return super.lookup(points, radiuses, encoder);
+
+        return super.lookup(points, encoder);
     }
 
     @Override
@@ -65,10 +66,7 @@ final public class AlternativeRoutingTemplate extends ViaRoutingTemplate {
     }
 
     @Override
-    // MARQ24 MOD START
-    //public boolean isReady(PathMerger pathMerger, Translation tr) {
-    public boolean isReady(PathMerger pathMerger, PathProcessingContext pathProcCntx) {
-    // MARQ24 MOD END
+    public boolean isReady(PathMerger pathMerger, Translation tr) {
         if (pathList.isEmpty())
             throw new RuntimeException("Empty paths for alternative route calculation not expected");
 
@@ -76,14 +74,12 @@ final public class AlternativeRoutingTemplate extends ViaRoutingTemplate {
         PointList wpList = getWaypoints();
         altResponse.setWaypoints(wpList);
         ghResponse.add(altResponse);
-        //pathMerger.doWork(altResponse, Collections.singletonList(pathList.get(0)), tr);
-        pathMerger.doWork(altResponse, Collections.singletonList(pathList.get(0)), pathProcCntx);
+        pathMerger.doWork(altResponse, Collections.singletonList(pathList.get(0)), tr);
         for (int index = 1; index < pathList.size(); index++) {
             PathWrapper tmpAltRsp = new PathWrapper();
             tmpAltRsp.setWaypoints(wpList);
             ghResponse.add(tmpAltRsp);
-            //pathMerger.doWork(tmpAltRsp, Collections.singletonList(pathList.get(index)), tr);
-            pathMerger.doWork(tmpAltRsp, Collections.singletonList(pathList.get(index)), pathProcCntx);
+            pathMerger.doWork(tmpAltRsp, Collections.singletonList(pathList.get(index)), tr);
         }
         return true;
     }

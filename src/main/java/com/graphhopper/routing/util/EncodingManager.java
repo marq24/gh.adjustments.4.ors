@@ -30,6 +30,9 @@ import com.graphhopper.util.PMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+
+import static com.graphhopper.util.Helper.toLowerCase;
 
 /**
  * Manager class to register encoder, assign their flag values and check objects with all encoders
@@ -51,14 +54,6 @@ public class EncodingManager {
     private int nextTurnBit = 0;
     private boolean enableInstructions = true;
     private String preferredLanguage = "";
-
-    // MARQ24 MOD START
-    // Modification by Maxim Rylov: Added a new class variable.
-    private int totalUsedBits = 0;
-    public int getUsedBitsForFlags() {
-        return totalUsedBits;
-    }
-    // MARQ24 MOD END
 
     /**
      * Instantiate manager with the given list of encoders. The manager knows several default
@@ -116,14 +111,14 @@ public class EncodingManager {
         if (encoderList.contains(":"))
             throw new IllegalArgumentException("EncodingManager does no longer use reflection instantiate encoders directly.");
 
-        if (!encoderList.equals(encoderList.toLowerCase()))
+        if (!encoderList.equals(toLowerCase(encoderList)))
             throw new IllegalArgumentException("Since 0.7 EncodingManager does no longer accept upper case profiles: " + encoderList);
 
         String[] entries = encoderList.split(",");
         List<FlagEncoder> resultEncoders = new ArrayList<FlagEncoder>();
 
         for (String entry : entries) {
-            entry = entry.trim().toLowerCase();
+            entry = toLowerCase(entry.trim());
             if (entry.isEmpty())
                 continue;
 
@@ -194,38 +189,26 @@ public class EncodingManager {
         int encoderCount = edgeEncoders.size();
         int usedBits = encoder.defineNodeBits(encoderCount, nextNodeBit);
         if (usedBits > bitsForEdgeFlags)
-            throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "node"));
-        // MARQ24 MOD START
-        totalUsedBits += usedBits - nextNodeBit;
-        // MARQ24 MOD END
-
+            throw new IllegalArgumentException(String.format(Locale.ROOT, ERR, usedBits, bitsForEdgeFlags, "node"));
         encoder.setNodeBitMask(usedBits - nextNodeBit, nextNodeBit);
         nextNodeBit = usedBits;
 
         usedBits = encoder.defineWayBits(encoderCount, nextWayBit);
         if (usedBits > bitsForEdgeFlags)
-            throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "way") + WAY_ERR);
+            throw new IllegalArgumentException(String.format(Locale.ROOT, ERR, usedBits, bitsForEdgeFlags, "way") + WAY_ERR);
         encoder.setWayBitMask(usedBits - nextWayBit, nextWayBit);
-        // MARQ24 MOD START
-        totalUsedBits += usedBits - nextWayBit;
-
-        // MARQ24 MOD END
         nextWayBit = usedBits;
 
         usedBits = encoder.defineRelationBits(encoderCount, nextRelBit);
         if (usedBits > bitsForEdgeFlags)
-            throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "relation"));
-        // MARQ24 MOD START
-        totalUsedBits += usedBits - nextRelBit;
-        // MARQ24 MOD END
-
+            throw new IllegalArgumentException(String.format(Locale.ROOT, ERR, usedBits, bitsForEdgeFlags, "relation"));
         encoder.setRelBitMask(usedBits - nextRelBit, nextRelBit);
         nextRelBit = usedBits;
 
         // turn flag bits are independent from edge encoder bits
         usedBits = encoder.defineTurnBits(encoderCount, nextTurnBit);
         if (usedBits > bitsForTurnFlags)
-            throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForTurnFlags, "turn"));
+            throw new IllegalArgumentException(String.format(Locale.ROOT, ERR, usedBits, bitsForTurnFlags, "turn"));
         nextTurnBit = usedBits;
 
         edgeEncoders.add(encoder);

@@ -1,14 +1,14 @@
 /*
  *  Licensed to GraphHopper GmbH under one or more contributor
- *  license agreements. See the NOTICE file distributed with this work for
+ *  license agreements. See the NOTICE file distributed with this work for 
  *  additional information regarding copyright ownership.
- *
- *  GraphHopper GmbH licenses this file to you under the Apache License,
- *  Version 2.0 (the "License"); you may not use this file except in
+ * 
+ *  GraphHopper GmbH licenses this file to you under the Apache License, 
+ *  Version 2.0 (the "License"); you may not use this file except in 
  *  compliance with the License. You may obtain a copy of the License at
- *
+ * 
  *       http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,8 +19,8 @@ package com.graphhopper.util;
 
 import com.graphhopper.PathWrapper;
 import com.graphhopper.routing.Path;
-import com.graphhopper.routing.PathProcessingContext;
-import com.graphhopper.routing.util.PathProcessor;
+import com.graphhopper.util.details.PathDetail;
+import com.graphhopper.util.details.PathDetailsBuilderFactory;
 import com.graphhopper.util.exceptions.ConnectionNotFoundException;
 
 import java.util.ArrayList;
@@ -28,11 +28,17 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * This class merges a list of points into one point recognizing the specified places.
+ * This class merges multiple {@link Path} objects into one continues object that
+ * can be used in the {@link PathWrapper}. There will be a Path between every waypoint.
+ * So for two waypoints there will be only one Path object. For three waypoints there will be
+ * two Path objects.
  * <p>
+ * The instructions are generated per Path object and are merged into one continues InstructionList.
+ * The PointList per Path object are merged and optionally simplified.
  *
  * @author Peter Karich
  * @author ratrun
+ * @author Robin Boldt
  */
 public class PathMerger {
     private static final DouglasPeucker DP = new DouglasPeucker();
@@ -40,6 +46,9 @@ public class PathMerger {
     private boolean simplifyResponse = true;
     private DouglasPeucker douglasPeucker = DP;
     private boolean calcPoints = true;
+    private PathDetailsBuilderFactory pathBuilderFactory;
+    private List<String> requestedPathDetails = Collections.EMPTY_LIST;
+    private double favoredHeading = Double.NaN;
 
     public PathMerger setCalcPoints(boolean calcPoints) {
         this.calcPoints = calcPoints;
@@ -48,6 +57,12 @@ public class PathMerger {
 
     public PathMerger setDouglasPeucker(DouglasPeucker douglasPeucker) {
         this.douglasPeucker = douglasPeucker;
+        return this;
+    }
+
+    public PathMerger setPathDetailsBuilders(PathDetailsBuilderFactory pathBuilderFactory, List<String> requestedPathDetails) {
+        this.pathBuilderFactory = pathBuilderFactory;
+        this.requestedPathDetails = requestedPathDetails;
         return this;
     }
 
@@ -61,65 +76,33 @@ public class PathMerger {
         return this;
     }
 
-    // MARQ24 MOD START
-    //public void doWork(PathWrapper altRsp, List<Path> paths, Translation tr) {
-    public void doWork(PathWrapper altRsp, List<Path> paths, PathProcessingContext procCntx) {
-    // MARQ24 MOD END
+    public void doWork(PathWrapper altRsp, List<Path> paths, Translation tr) {
         int origPoints = 0;
         long fullTimeInMillis = 0;
         double fullWeight = 0;
         double fullDistance = 0;
         boolean allFound = true;
 
-        // MARQ24 MOD START
-        // Modification by Maxim Rylov
-        PathProcessor pathProcessor = procCntx.getPathProcessor();
-        if (pathProcessor != null) {
-            pathProcessor.init(procCntx);
-        }
-        //******************************
-        //ORG CODE
-        //InstructionList fullInstructions = new InstructionList(tr);
-        InstructionList fullInstructions = new InstructionList(procCntx.getTranslation());
-        // MARQ24 MOD END
-
+        InstructionList fullInstructions = new InstructionList(tr);
         PointList fullPoints = PointList.EMPTY;
-        List<String> description = new ArrayList<String>();
+        List<String> description = new ArrayList<>();
         for (int pathIndex = 0; pathIndex < paths.size(); pathIndex++) {
             Path path = paths.get(pathIndex);
-
-            // MARQ24 MOD START
-            procCntx.setPathIndex(pathIndex); // Modification by Maxim Rylov
-            // MARQ24 MOD END
-
+            if (!path.isFound()) {
+                allFound = false;
+                continue;
+            }
             description.addAll(path.getDescription());
             fullTimeInMillis += path.getTime();
             fullDistance += path.getDistance();
             fullWeight += path.getWeight();
             if (enableInstructions) {
-                // MARQ24 MOD START
-                // ORG CODE
-                //InstructionList il = path.calcInstructions(tr);
-                InstructionList il = path.calcInstructions(procCntx);
-                // MARQ24 MOD END
+                InstructionList il = path.calcInstructions(tr);
 
                 if (!il.isEmpty()) {
-                    if (fullPoints.isEmpty()) {
-                        PointList pl = il.get(0).getPoints();
-                        // do a wild guess about the total number of points to avoid reallocation a bit
-                        fullPoints = new PointList(il.size() * Math.min(10, pl.size()), pl.is3D());
-                    }
+                    fullInstructions.addAll(il);
 
-                    for (Instruction i : il) {
-                        if (simplifyResponse) {
-                            origPoints += i.getPoints().size();
-                            douglasPeucker.simplify(i.getPoints());
-                        }
-                        fullInstructions.add(i);
-                        fullPoints.add(i.getPoints());
-                    }
-
-                    // if not yet reached finish replace with 'reached via'
+                    // for all paths except the last replace the FinishInstruction with a ViaInstructionn
                     if (pathIndex + 1 < paths.size()) {
                         ViaInstruction newInstr = new ViaInstruction(fullInstructions.get(fullInstructions.size() - 1));
                         newInstr.setViaCount(pathIndex + 1);
@@ -127,54 +110,115 @@ public class PathMerger {
                     }
                 }
 
-            } else if (calcPoints) {
+            }
+            if (calcPoints || enableInstructions) {
                 PointList tmpPoints = path.calcPoints();
                 if (fullPoints.isEmpty())
                     fullPoints = new PointList(tmpPoints.size(), tmpPoints.is3D());
 
-                if (simplifyResponse) {
-                    origPoints = tmpPoints.getSize();
-                    douglasPeucker.simplify(tmpPoints);
+                // Remove duplicated points, see #1138
+                if (pathIndex + 1 < paths.size()) {
+                    tmpPoints.removeLastPoint();
                 }
+
                 fullPoints.add(tmpPoints);
+                altRsp.addPathDetails(path.calcDetails(requestedPathDetails, pathBuilderFactory, origPoints));
+                origPoints = fullPoints.size();
             }
 
             allFound = allFound && path.isFound();
         }
 
-        // MARQ24 MOD START
-        // Modification by Maxim Rylov
-        if (pathProcessor != null) {
-            pathProcessor.finish();
-        }
-        //****************************
-        // MARQ24 MOD END
-
         if (!fullPoints.isEmpty()) {
-            // MARQ24 MOD START
-            if (pathProcessor != null){
-                fullPoints = pathProcessor.processPoints(fullPoints);
-            }
-            // MARQ24 MOD END
-
             String debug = altRsp.getDebugInfo() + ", simplify (" + origPoints + "->" + fullPoints.getSize() + ")";
             altRsp.addDebugInfo(debug);
-            if (fullPoints.is3D) {
+            if (fullPoints.is3D)
                 calcAscendDescend(altRsp, fullPoints);
-            }
         }
 
-        if (enableInstructions)
+        if (enableInstructions) {
+            fullInstructions = updateInstructionsWithContext(fullInstructions);
             altRsp.setInstructions(fullInstructions);
+        }
 
-        if (!allFound)
+        if (!allFound) {
             altRsp.addError(new ConnectionNotFoundException("Connection between locations not found", Collections.<String, Object>emptyMap()));
+        }
 
         altRsp.setDescription(description).
                 setPoints(fullPoints).
                 setRouteWeight(fullWeight).
                 setDistance(fullDistance).
                 setTime(fullTimeInMillis);
+
+        if (allFound && simplifyResponse && (calcPoints || enableInstructions)) {
+            PathSimplification ps = new PathSimplification(altRsp, douglasPeucker, enableInstructions);
+            ps.simplify();
+        }
+    }
+
+    /**
+     * Merges <code>otherDetails</code> into the <code>pathDetails</code>.
+     * <p>
+     * This method makes sure that Entry list around via points are merged correctly.
+     * See #1091 and the misplaced PathDetail after waypoints.
+     */
+    public static void merge(List<PathDetail> pathDetails, List<PathDetail> otherDetails) {
+        // Make sure that the PathDetail list is merged correctly at via points
+        if (!pathDetails.isEmpty() && !otherDetails.isEmpty()) {
+            PathDetail lastDetail = pathDetails.get(pathDetails.size() - 1);
+            if (lastDetail.getValue().equals(otherDetails.get(0).getValue())) {
+                lastDetail.setLast(otherDetails.get(0).getLast());
+                otherDetails.remove(0);
+            }
+        }
+
+        pathDetails.addAll(otherDetails);
+    }
+
+    /**
+     * This method iterates over all instructions and uses the available context to improve the instructions.
+     * If the requests contains a heading, this method can transform the first continue to a u-turn if the heading
+     * points into the opposite direction of the route.
+     * At a waypoint it can transform the continue to a u-turn if the route involves turning.
+     */
+    private InstructionList updateInstructionsWithContext(InstructionList instructions) {
+        Instruction instruction;
+        Instruction nextInstruction;
+
+        for (int i = 0; i < instructions.size() - 1; i++) {
+            instruction = instructions.get(i);
+
+            if (i == 0 && !Double.isNaN(favoredHeading) && instruction.extraInfo.containsKey("heading")) {
+                double heading = (double) instruction.extraInfo.get("heading");
+                double diff = Math.abs(heading - favoredHeading) % 360;
+                if (diff > 170 && diff < 190) {
+                    // The requested heading points into the opposite direction of the calculated heading
+                    // therefore we change the continue instruction to a u-turn
+                    instruction.setSign(Instruction.U_TURN_UNKNOWN);
+                }
+            }
+
+            if (instruction.getSign() == Instruction.REACHED_VIA) {
+                nextInstruction = instructions.get(i + 1);
+                if (nextInstruction.getSign() != Instruction.CONTINUE_ON_STREET
+                        || !instruction.extraInfo.containsKey("last_heading")
+                        || !nextInstruction.extraInfo.containsKey("heading")) {
+                    // TODO throw exception?
+                    continue;
+                }
+                double lastHeading = (double) instruction.extraInfo.get("last_heading");
+                double heading = (double) nextInstruction.extraInfo.get("heading");
+
+                // Since it's supposed to go back the same edge, we can be very strict with the diff
+                double diff = Math.abs(lastHeading - heading) % 360;
+                if (diff > 179 && diff < 181) {
+                    nextInstruction.setSign(Instruction.U_TURN_UNKNOWN);
+                }
+            }
+        }
+
+        return instructions;
     }
 
     private void calcAscendDescend(final PathWrapper rsp, final PointList pointList) {
@@ -195,5 +239,9 @@ public class PathMerger {
         }
         rsp.setAscend(ascendMeters);
         rsp.setDescend(descendMeters);
+    }
+
+    public void setFavoredHeading(double favoredHeading) {
+        this.favoredHeading = favoredHeading;
     }
 }

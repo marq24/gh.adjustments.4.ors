@@ -86,12 +86,6 @@ public final class GraphHopperStorage implements GraphStorage, Graph {
         }
     }
 
-    // MARQ24 MOD START - just add a singleMethod
-    public int getEdges() {
-        return baseGraph.edgeCount;
-    }
-    // MARQ24 MOD END
-
     /**
      * This method returns the routing graph for the specified weighting, could be potentially
      * filled with shortcuts.
@@ -233,7 +227,7 @@ public final class GraphHopperStorage implements GraphStorage, Graph {
         baseGraph.checkInit();
         if (properties.loadExisting()) {
             properties.checkVersions(false);
-            // check encoding for compatiblity
+            // check encoding for compatibility
             String flagEncodersStr = properties.get("graph.flag_encoders");
 
             if (!flagEncodersStr.isEmpty() && !encodingManager.toDetailsString().equalsIgnoreCase(flagEncodersStr)) {
@@ -305,7 +299,7 @@ public final class GraphHopperStorage implements GraphStorage, Graph {
 
     /**
      * Avoid that edges and nodes of the base graph are further modified. Necessary as hook for e.g.
-     * ch graphs on top to initilize themself
+     * ch graphs on top to initialize themselves
      */
     public synchronized void freeze() {
         if (!baseGraph.isFrozen())

@@ -26,12 +26,14 @@ import com.graphhopper.storage.Graph;
 import com.graphhopper.storage.NodeAccess;
 import com.graphhopper.storage.SPTEntry;
 import com.graphhopper.util.*;
+import com.graphhopper.util.details.PathDetail;
+import com.graphhopper.util.details.PathDetailsBuilder;
+import com.graphhopper.util.details.PathDetailsBuilderFactory;
+import com.graphhopper.util.details.PathDetailsFromEdges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * Stores the nodes for the found path of an algorithm. It additionally needs the edgeIds to make
@@ -262,11 +264,7 @@ public class Path {
             tmpNode = edgeBase.getBaseNode();
             // more efficient swap, currently not implemented for virtual edges: visitor.next(edgeBase.detach(true), i);
             edgeBase = graph.getEdgeIteratorState(edgeBase.getEdge(), tmpNode);
-
-            // MARQ24 MOD START
-            //visitor.next(edgeBase, i, prevEdgeId);
-            visitor.next(edgeBase, i, len, prevEdgeId);
-            // MARQ24 MOD START
+            visitor.next(edgeBase, i, prevEdgeId);
 
             prevEdgeId = edgeBase.getEdge();
         }
@@ -283,12 +281,10 @@ public class Path {
 
         forEveryEdge(new EdgeVisitor() {
             @Override
-            // MARQ24 MOD START
-            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
-            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
-            // MARQ24 MOD END
+            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
                 edges.add(eb);
             }
+
             @Override
             public void finish() {
 
@@ -313,10 +309,7 @@ public class Path {
         nodes.add(tmpNode);
         forEveryEdge(new EdgeVisitor() {
             @Override
-            // MARQ24 MOD START
-            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
-            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
-            // MARQ24 MOD END
+            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
                 nodes.add(eb.getAdjNode());
             }
 
@@ -347,10 +340,7 @@ public class Path {
         points.add(nodeAccess, tmpNode);
         forEveryEdge(new EdgeVisitor() {
             @Override
-            // MARQ24 MOD END
-            //public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
-            public void next(EdgeIteratorState eb, int index, int len, int prevEdgeId) {
-            // MARQ24 MOD END
+            public void next(EdgeIteratorState eb, int index, int prevEdgeId) {
                 PointList pl = eb.fetchWayGeometry(2);
                 for (int j = 0; j < pl.getSize(); j++) {
                     points.add(pl, j);
@@ -365,13 +355,9 @@ public class Path {
         return points;
     }
 
-
-    // MARQ24 MOD START
     /**
      * @return the list of instructions for this path.
      */
-    // ORG CODE START
-    /*
     public InstructionList calcInstructions(final Translation tr) {
         final InstructionList ways = new InstructionList(edgeIds.size() / 4, tr);
         if (edgeIds.isEmpty()) {
@@ -382,23 +368,33 @@ public class Path {
         }
         forEveryEdge(new InstructionsFromEdges(getFromNode(), graph, weighting, encoder, nodeAccess, tr, ways));
         return ways;
-    } ORG CODE END*/
+    }
 
     /**
-     * @return the list of instructions for this path.
+     * Calculates the PathDetails for this Path. This method will return fast, if there are no calculators.
+     *
+     * @param pathBuilderFactory Generates the relevant PathBuilders
+     * @return List of PathDetails for this Path
      */
-    public InstructionList calcInstructions(PathProcessingContext procCntx) {
-        final InstructionList ways = new InstructionList(edgeIds.size() / 4, procCntx.getTranslation());
-        if (edgeIds.isEmpty()) {
-            if (isFound()) {
-                ways.add(new FinishInstruction(nodeAccess, endNode));
-            }
-            return ways;
+    public Map<String, List<PathDetail>> calcDetails(List<String> requestedPathDetails, PathDetailsBuilderFactory pathBuilderFactory, int previousIndex) {
+        if (!isFound() || requestedPathDetails.isEmpty())
+            return Collections.EMPTY_MAP;
+        List<PathDetailsBuilder> pathBuilders = pathBuilderFactory.createPathDetailsBuilders(requestedPathDetails, encoder, weighting);
+        if (pathBuilders.isEmpty())
+            return Collections.EMPTY_MAP;
+
+        forEveryEdge(new PathDetailsFromEdges(pathBuilders, previousIndex));
+
+        Map<String, List<PathDetail>> pathDetails = new HashMap<>(pathBuilders.size());
+        for (PathDetailsBuilder builder : pathBuilders) {
+            Map.Entry<String, List<PathDetail>> entry = builder.build();
+            List<PathDetail> existing = pathDetails.put(entry.getKey(), entry.getValue());
+            if (existing != null)
+                throw new IllegalStateException("Some PathDetailsBuilders use duplicate key: " + entry.getKey());
         }
-        forEveryEdge(new InstructionsFromEdges(getFromNode(), graph, weighting, encoder, nodeAccess, procCntx, ways));
-        return ways;
+
+        return pathDetails;
     }
-    // MARQ24 MOD END
 
     @Override
     public String toString() {
@@ -420,10 +416,8 @@ public class Path {
      * The callback used in forEveryEdge.
      */
     public interface EdgeVisitor {
-        // MARQ24 MOD START
-        //void next(EdgeIteratorState edge, int index, int prevEdgeId);
-        void next(EdgeIteratorState edge, int index, int count, int prevEdgeId);
-        // MARQ24 MOD END
+        void next(EdgeIteratorState edge, int index, int prevEdgeId);
+
         void finish();
     }
 }
