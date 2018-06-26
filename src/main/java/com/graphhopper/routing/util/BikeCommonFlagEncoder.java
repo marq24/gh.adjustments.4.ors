@@ -47,7 +47,10 @@ abstract public class BikeCommonFlagEncoder extends AbstractFlagEncoder {
     protected final Set<String> avoidHighwayTags = new HashSet<String>();
     protected final Set<String> unpavedSurfaceTags = new HashSet<String>();
     private final Map<String, Integer> trackTypeSpeeds = new HashMap<String, Integer>();
-    private final Map<String, Integer> surfaceSpeeds = new HashMap<String, Integer>();
+    // MARQ24 MOD START
+    //private final Map<String, Integer> surfaceSpeeds = new HashMap<String, Integer>();
+    protected final Map<String, Integer> surfaceSpeeds = new HashMap<String, Integer>();
+    // MARQ24 MOD END
     private final Set<String> roadValues = new HashSet<String>();
     private final Map<String, Integer> highwaySpeeds = new HashMap<String, Integer>();
     // convert network tag of bicycle routes into a way route code
@@ -57,10 +60,15 @@ abstract public class BikeCommonFlagEncoder extends AbstractFlagEncoder {
     private long unpavedBit = 0;
     private EncodedValue wayTypeEncoder;
     // Car speed limit which switches the preference from UNCHANGED to AVOID_IF_POSSIBLE
-    private int avoidSpeedLimit;
-
+    // MARQ24 MOD START
+    //private int avoidSpeedLimit;
+    protected int avoidSpeedLimit;
+    // MARQ24 MOD END
     // This is the specific bicycle class
-    private String classBicycleKey;
+    // MARQ24 MOD START
+    //private String classBicycleKey;
+    protected String classBicycleKey;
+    // MARQ24 MOD END
 
     // MARQ24 MOD START
     // Modification by Maxim Rylov: Added new class members.

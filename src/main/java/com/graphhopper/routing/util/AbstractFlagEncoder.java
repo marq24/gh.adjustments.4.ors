@@ -526,6 +526,14 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
      * Special handling for ferry ways.
      */
     protected double getFerrySpeed(ReaderWay way) {
+        // MARQ24 MOD START
+        return getFerrySpeed(way, Integer.MIN_VALUE,Integer.MIN_VALUE, Integer.MIN_VALUE);
+        // MARQ24 MOD END
+    }
+
+    // MARQ24 MOD START
+    protected double getFerrySpeed(ReaderWay way, double unknownSpeed, double shortTripsSpeed, double longTripsSpeed) {
+    // MARQ24 MOD END
         long duration = 0;
 
         try {
@@ -572,12 +580,33 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
             if(estimatedLength != null && estimatedLength.doubleValue() <= 300)
                 return speedEncoder.factor / 2;
             // unknown speed -> put penalty on ferry transport
-            return UNKNOWN_DURATION_FERRY_SPEED;
+            // MARQ24 MOD START
+            if(Integer.MIN_VALUE == unknownSpeed)
+            // MARQ24 MOD END
+                return UNKNOWN_DURATION_FERRY_SPEED;
+            // MARQ24 MOD START
+            else
+                return unknownSpeed;
+            // MARQ24 MOD END
         } else if (durationInHours > 1) {
             // lengthy ferries should be faster than short trip ferry
-            return LONG_TRIP_FERRY_SPEED;
+            // MARQ24 MOD START
+            if(Integer.MIN_VALUE == longTripsSpeed)
+            // MARQ24 MOD END
+                return LONG_TRIP_FERRY_SPEED;
+            // MARQ24 MOD START
+            else
+                return longTripsSpeed;
+            // MARQ24 MOD END
         } else {
-            return SHORT_TRIP_FERRY_SPEED;
+            // MARQ24 MOD START
+            if(Integer.MIN_VALUE == shortTripsSpeed)
+            // MARQ24 MOD END
+                return SHORT_TRIP_FERRY_SPEED;
+            // MARQ24 MOD START
+            else
+                return shortTripsSpeed;
+            // MARQ24 MOD END
         }
     }
 
