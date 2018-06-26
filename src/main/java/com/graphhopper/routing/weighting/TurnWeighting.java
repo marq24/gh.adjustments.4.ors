@@ -72,7 +72,10 @@ public class TurnWeighting implements Weighting {
         if (prevOrNextEdgeId == EdgeIterator.NO_EDGE)
             return weight;
 
-        int edgeId = edgeState.getEdge();
+        // MARQ24 MOD START
+        //int edgeId = edgeState.getEdge();
+        int edgeId = edgeState.getOriginalEdge();
+        // MARQ24 MOD END
         double turnCosts;
         if (reverse)
             turnCosts = calcTurnWeight(edgeId, edgeState.getBaseNode(), prevOrNextEdgeId);

@@ -30,6 +30,19 @@ public class RoundaboutInstruction extends Instruction {
     private boolean exited = false;
     private double radian = Double.NaN;
 
+    //MARQ24 - Modified by Maxim Rylov: Added new member
+    private int[] roundaboutExitBearings;
+
+    // MARQ24 MOD START
+    public int[] getRoundaboutExitBearings() {
+        return roundaboutExitBearings;
+    }
+
+    public void setRoundaboutExitBearings(int[] bearings) {
+        this.roundaboutExitBearings = bearings;
+    }
+    // MARQ24 MOD END
+
     public RoundaboutInstruction(int sign, String name, InstructionAnnotation ia, PointList pl) {
         super(sign, name, ia, pl);
     }

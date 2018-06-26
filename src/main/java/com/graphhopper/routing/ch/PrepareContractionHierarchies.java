@@ -323,6 +323,7 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation imple
                     neighborSW.stop();
                 }
 
+                // Hendrik: PHAST algorithm does not work properly with removed shortcuts
                 prepareGraph.disconnect(vehicleAllTmpExplorer, iter);
             }
         }
@@ -371,6 +372,12 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation imple
     public Weighting getWeighting() {
         return prepareGraph.getWeighting();
     }
+
+    // MARQ24 MOD START ADDED (exposed prepareWeighting)
+    public Weighting getPrepareWeighting() {
+        return prepareWeighting;
+    }
+    // MARQ24 MOD END
 
     public void close() {
         prepareAlgo.close();
@@ -647,13 +654,11 @@ public class PrepareContractionHierarchies extends AbstractAlgoPreparation imple
             AStarBidirection tmpAlgo = new AStarBidirectionCH(graph, prepareWeighting, traversalMode);
             tmpAlgo.setApproximation(RoutingAlgorithmFactorySimple.getApproximation(ASTAR_BI, opts, graph.getNodeAccess()));
             algo = tmpAlgo;
-
         } else if (DIJKSTRA_BI.equals(opts.getAlgorithm())) {
             algo = new DijkstraBidirectionCH(graph, prepareWeighting, traversalMode);
         } else {
             throw new IllegalArgumentException("Algorithm " + opts.getAlgorithm() + " not supported for Contraction Hierarchies. Try with ch.disable=true");
         }
-
         algo.setMaxVisitedNodes(opts.getMaxVisitedNodes());
         algo.setEdgeFilter(levelFilter);
         return algo;

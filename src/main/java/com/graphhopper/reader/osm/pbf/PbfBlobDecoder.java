@@ -116,6 +116,10 @@ public class PbfBlobDecoder implements Runnable {
          */
     }
 
+    // MARQ24 MOD START Modification by Maxim Rylov: entityTags object moved to class members. this allows avoiding unneded allocations.
+    private Map<String, String> entityTags = null;
+    // MARQ24 MOD END
+
     private Map<String, String> buildTags(List<Integer> keys, List<Integer> values, PbfFieldDecoder fieldDecoder) {
 
         // Ensure parallel lists are of equal size.
@@ -126,9 +130,21 @@ public class PbfBlobDecoder implements Runnable {
             }
         }
 
+        // MARQ24 MOD START
+        if (entityTags == null) {
+            entityTags = new HashMap<String, String>(keys.size());
+        }else {
+            entityTags.clear();
+        }
+        // MARQ24 MOD END
+
+
         Iterator<Integer> keyIterator = keys.iterator();
         Iterator<Integer> valueIterator = values.iterator();
         if (keyIterator.hasNext()) {
+            // MARQ24 MOD START
+            // ORG CODE START
+            /*
             Map<String, String> tags = new HashMap<String, String>(keys.size());
             while (keyIterator.hasNext()) {
                 String key = fieldDecoder.decodeString(keyIterator.next());
@@ -136,6 +152,21 @@ public class PbfBlobDecoder implements Runnable {
                 tags.put(key, value);
             }
             return tags;
+            */
+            // ORG CODE END
+            int keyId = 1;
+            while (keyIterator.hasNext()) {
+                keyId = keyIterator.next();
+                if (!fieldDecoder.skip(keyId)) {
+                    String key = fieldDecoder.decodeString(keyId);
+                    String value = fieldDecoder.decodeString(valueIterator.next());
+                    entityTags.put(key, value);
+                } else {
+                    valueIterator.next();
+                }
+            }
+            return entityTags;
+            // MARQ24 MOD END
         }
         return null;
     }
@@ -215,7 +246,12 @@ public class PbfBlobDecoder implements Runnable {
             // Build the tags. The key and value string indexes are sequential
             // in the same PBF array. Each set of tags is delimited by an index
             // with a value of 0.
-            Map<String, String> tags = null;
+
+            // MARQ24 MOD START
+            //Map<String, String> tags = null;
+            Map<String, String> tags = entityTags;
+            // MARQ24 MOD END
+
             while (keysValuesIterator.hasNext()) {
                 int keyIndex = keysValuesIterator.next();
                 if (keyIndex == 0) {
@@ -234,7 +270,13 @@ public class PbfBlobDecoder implements Runnable {
                     tags = new HashMap<String, String>(Math.max(3, 2 * (nodes.getKeysValsList().size() / 2) / idList.size()));
                 }
 
-                tags.put(fieldDecoder.decodeString(keyIndex), fieldDecoder.decodeString(valueIndex));
+                // MARQ24 MOD START
+                if (!fieldDecoder.skip(keyIndex)) {
+                // MARQ24 MOD END
+                    tags.put(fieldDecoder.decodeString(keyIndex), fieldDecoder.decodeString(valueIndex));
+                // MARQ24 MOD START
+                }
+                // MARQ24 MOD END
             }
 
             ReaderNode node = new ReaderNode(nodeId, ((double) latitude) / 10000000, ((double) longitude) / 10000000);
@@ -248,7 +290,10 @@ public class PbfBlobDecoder implements Runnable {
     private void processWays(List<Osmformat.Way> ways, PbfFieldDecoder fieldDecoder) {
         for (Osmformat.Way way : ways) {
             Map<String, String> tags = buildTags(way.getKeysList(), way.getValsList(), fieldDecoder);
-            ReaderWay osmWay = new ReaderWay(way.getId());
+            // MARQ24 MOD START
+            //ReaderWay osmWay = new ReaderWay(way.getId());
+            ReaderWay osmWay = new ReaderWay(way.getId(), way.getRefsList().size()); // Modification by Maxim Rylov:  Make use of a constructor with capacity parameter.
+            // MARQ24 MOD END
             osmWay.setTags(tags);
 
             // Build up the list of way nodes for the way. The node ids are

@@ -15,43 +15,28 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package com.graphhopper.reader;
+package com.graphhopper.routing.util;
 
-import com.carrotsearch.hppc.LongArrayList;
+import com.graphhopper.util.EdgeIteratorState;
 
 /**
- * Represents a way received from the reader.
+ * Class used to traverse a graph.
  * <p>
  *
- * @author Nop
+ * @author Peter Karich
  */
-public class ReaderWay extends ReaderElement {
-    // MARQ24 MOD START
-    // ORG CODE
-    /*protected final LongArrayList nodes = new LongArrayList(5);
-    public ReaderWay(long id) {
-        super(id, WAY);
-    }*/
-    // ORG CODE END
 
-    protected final LongArrayList nodes;
+// MARQ24 PLAIN COPY OF 'EdgeFilter'
+public interface CHEdgeFilter {
+	static final CHEdgeFilter ALL_EDGES = new CHEdgeFilter() {
+		@Override
+		public final boolean accept(EdgeIteratorState edgeState) {
+			return true;
+		}
+	};
 
-    public ReaderWay(long id) {
-        this(id, 5);
-    }
-
-    public ReaderWay(long id, int size) {
-        super(id, WAY);
-        nodes = new LongArrayList(size);
-    }
-    // MARQ24 MOD END
-
-    public LongArrayList getNodes() {
-        return nodes;
-    }
-
-    @Override
-    public String toString() {
-        return "Way id:" + getId() + ", nodes:" + nodes.size() + ", tags:" + super.toString();
-    }
+	/**
+	 * @return true if the current edge should be processed and false otherwise.
+	 */
+	boolean accept(EdgeIteratorState edgeState);
 }

@@ -52,6 +52,14 @@ public class EncodingManager {
     private boolean enableInstructions = true;
     private String preferredLanguage = "";
 
+    // MARQ24 MOD START
+    // Modification by Maxim Rylov: Added a new class variable.
+    private int totalUsedBits = 0;
+    public int getUsedBitsForFlags() {
+        return totalUsedBits;
+    }
+    // MARQ24 MOD END
+
     /**
      * Instantiate manager with the given list of encoders. The manager knows several default
      * encoders ignoring case.
@@ -187,6 +195,10 @@ public class EncodingManager {
         int usedBits = encoder.defineNodeBits(encoderCount, nextNodeBit);
         if (usedBits > bitsForEdgeFlags)
             throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "node"));
+        // MARQ24 MOD START
+        totalUsedBits += usedBits - nextNodeBit;
+        // MARQ24 MOD END
+
         encoder.setNodeBitMask(usedBits - nextNodeBit, nextNodeBit);
         nextNodeBit = usedBits;
 
@@ -194,11 +206,19 @@ public class EncodingManager {
         if (usedBits > bitsForEdgeFlags)
             throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "way") + WAY_ERR);
         encoder.setWayBitMask(usedBits - nextWayBit, nextWayBit);
+        // MARQ24 MOD START
+        totalUsedBits += usedBits - nextWayBit;
+
+        // MARQ24 MOD END
         nextWayBit = usedBits;
 
         usedBits = encoder.defineRelationBits(encoderCount, nextRelBit);
         if (usedBits > bitsForEdgeFlags)
             throw new IllegalArgumentException(String.format(ERR, usedBits, bitsForEdgeFlags, "relation"));
+        // MARQ24 MOD START
+        totalUsedBits += usedBits - nextRelBit;
+        // MARQ24 MOD END
+
         encoder.setRelBitMask(usedBits - nextRelBit, nextRelBit);
         nextRelBit = usedBits;
 

@@ -30,11 +30,9 @@ import com.graphhopper.routing.weighting.AvoidEdgesWeighting;
 import com.graphhopper.storage.index.LocationIndex;
 import com.graphhopper.storage.index.QueryResult;
 import com.graphhopper.util.Helper;
-import com.graphhopper.util.Parameters;
 import com.graphhopper.util.Parameters.Algorithms;
 import com.graphhopper.util.Parameters.Algorithms.RoundTrip;
 import com.graphhopper.util.PathMerger;
-import com.graphhopper.util.Translation;
 import com.graphhopper.util.exceptions.PointNotFoundException;
 import com.graphhopper.util.shapes.GHPoint;
 
@@ -66,9 +64,13 @@ public class RoundTripRoutingTemplate extends AbstractRoutingTemplate implements
     }
 
     @Override
-    public List<QueryResult> lookup(List<GHPoint> points, FlagEncoder encoder) {
-        if (points.isEmpty())
+    // MARQ24 MOD START
+    //public List<QueryResult> lookup(List<GHPoint> points, FlagEncoder encoder) {
+    public List<QueryResult> lookup(List<GHPoint> points, double[] distances, FlagEncoder encoder) {
+    // MARQ24 MOD END
+        if (points.isEmpty()) {
             throw new IllegalStateException("For round trip calculation one point is required");
+        }
         final double distanceInMeter = ghRequest.getHints().getDouble(RoundTrip.DISTANCE, 10000);
         final long seed = ghRequest.getHints().getLong(RoundTrip.SEED, 0L);
         final double initialHeading = ghRequest.getHints().getDouble(RoundTrip.HEADING, Double.NaN);
@@ -111,7 +113,7 @@ public class RoundTripRoutingTemplate extends AbstractRoutingTemplate implements
         AvoidEdgesWeighting avoidPathWeighting = new AvoidEdgesWeighting(algoOpts.getWeighting());
         avoidPathWeighting.setEdgePenaltyFactor(5);
         algoOpts = AlgorithmOptions.start(algoOpts).
-                algorithm(Parameters.Algorithms.ASTAR_BI).
+                algorithm(Algorithms.ASTAR_BI).
                 weighting(avoidPathWeighting).build();
         algoOpts.getHints().put(Algorithms.ASTAR_BI + ".epsilon", 2);
 
@@ -147,11 +149,19 @@ public class RoundTripRoutingTemplate extends AbstractRoutingTemplate implements
     }
 
     @Override
-    public boolean isReady(PathMerger pathMerger, Translation tr) {
+    // MARQ24 MOD START
+    //public boolean isReady(PathMerger pathMerger, Translation tr) {
+    public boolean isReady(PathMerger pathMerger, PathProcessingContext pathProcCntx) {
+    // MARQ24 MOD END
         altResponse = new PathWrapper();
         altResponse.setWaypoints(getWaypoints());
         ghResponse.add(altResponse);
-        pathMerger.doWork(altResponse, pathList, tr);
+
+        // MARQ24 MOD START
+        //pathMerger.doWork(altResponse, pathList, tr);
+        pathMerger.doWork(altResponse, pathList, pathProcCntx);
+        // MARQ24 MOD END
+
         // with potentially retrying, including generating new route points, for now disabled
         return true;
     }

@@ -1,14 +1,14 @@
 /*
  *  Licensed to GraphHopper GmbH under one or more contributor
- *  license agreements. See the NOTICE file distributed with this work for 
+ *  license agreements. See the NOTICE file distributed with this work for
  *  additional information regarding copyright ownership.
- * 
- *  GraphHopper GmbH licenses this file to you under the Apache License, 
- *  Version 2.0 (the "License"); you may not use this file except in 
+ *
+ *  GraphHopper GmbH licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except in
  *  compliance with the License. You may obtain a copy of the License at
- * 
+ *
  *       http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +19,8 @@ package com.graphhopper.util;
 
 import com.graphhopper.PathWrapper;
 import com.graphhopper.routing.Path;
+import com.graphhopper.routing.PathProcessingContext;
+import com.graphhopper.routing.util.PathProcessor;
 import com.graphhopper.util.exceptions.ConnectionNotFoundException;
 
 import java.util.ArrayList;
@@ -59,24 +61,47 @@ public class PathMerger {
         return this;
     }
 
-    public void doWork(PathWrapper altRsp, List<Path> paths, Translation tr) {
+    // MARQ24 MOD START
+    //public void doWork(PathWrapper altRsp, List<Path> paths, Translation tr) {
+    public void doWork(PathWrapper altRsp, List<Path> paths, PathProcessingContext procCntx) {
+    // MARQ24 MOD END
         int origPoints = 0;
         long fullTimeInMillis = 0;
         double fullWeight = 0;
         double fullDistance = 0;
         boolean allFound = true;
 
-        InstructionList fullInstructions = new InstructionList(tr);
+        // MARQ24 MOD START
+        // Modification by Maxim Rylov
+        PathProcessor pathProcessor = procCntx.getPathProcessor();
+        if (pathProcessor != null) {
+            pathProcessor.init(procCntx);
+        }
+        //******************************
+        //ORG CODE
+        //InstructionList fullInstructions = new InstructionList(tr);
+        InstructionList fullInstructions = new InstructionList(procCntx.getTranslation());
+        // MARQ24 MOD END
+
         PointList fullPoints = PointList.EMPTY;
         List<String> description = new ArrayList<String>();
         for (int pathIndex = 0; pathIndex < paths.size(); pathIndex++) {
             Path path = paths.get(pathIndex);
+
+            // MARQ24 MOD START
+            procCntx.setPathIndex(pathIndex); // Modification by Maxim Rylov
+            // MARQ24 MOD END
+
             description.addAll(path.getDescription());
             fullTimeInMillis += path.getTime();
             fullDistance += path.getDistance();
             fullWeight += path.getWeight();
             if (enableInstructions) {
-                InstructionList il = path.calcInstructions(tr);
+                // MARQ24 MOD START
+                // ORG CODE
+                //InstructionList il = path.calcInstructions(tr);
+                InstructionList il = path.calcInstructions(procCntx);
+                // MARQ24 MOD END
 
                 if (!il.isEmpty()) {
                     if (fullPoints.isEmpty()) {
@@ -117,11 +142,26 @@ public class PathMerger {
             allFound = allFound && path.isFound();
         }
 
+        // MARQ24 MOD START
+        // Modification by Maxim Rylov
+        if (pathProcessor != null) {
+            pathProcessor.finish();
+        }
+        //****************************
+        // MARQ24 MOD END
+
         if (!fullPoints.isEmpty()) {
+            // MARQ24 MOD START
+            if (pathProcessor != null){
+                fullPoints = pathProcessor.processPoints(fullPoints);
+            }
+            // MARQ24 MOD END
+
             String debug = altRsp.getDebugInfo() + ", simplify (" + origPoints + "->" + fullPoints.getSize() + ")";
             altRsp.addDebugInfo(debug);
-            if (fullPoints.is3D)
+            if (fullPoints.is3D) {
                 calcAscendDescend(altRsp, fullPoints);
+            }
         }
 
         if (enableInstructions)

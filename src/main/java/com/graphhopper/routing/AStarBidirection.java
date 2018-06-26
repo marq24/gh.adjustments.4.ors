@@ -19,7 +19,6 @@ package com.graphhopper.routing;
 
 import com.carrotsearch.hppc.IntHashSet;
 import com.carrotsearch.hppc.IntObjectMap;
-import com.carrotsearch.hppc.predicates.IntObjectPredicate;
 import com.graphhopper.coll.GHIntObjectHashMap;
 import com.graphhopper.routing.AStar.AStarEntry;
 import com.graphhopper.routing.util.TraversalMode;
@@ -31,8 +30,6 @@ import com.graphhopper.storage.Graph;
 import com.graphhopper.storage.SPTEntry;
 import com.graphhopper.util.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.PriorityQueue;
 
 /**
@@ -235,8 +232,12 @@ public class AStarBidirection extends AbstractBidirAlgo implements Recalculation
 
             // TODO performance: check if the node is already existent in the opposite direction
             // then we could avoid the approximation as we already know the exact complete path!
-            double alreadyVisitedWeight = weighting.calcWeight(iter, reverse, currEdge.edge)
-                    + currEdge.getWeightOfVisitedPath();
+
+            // MARQ24 MOD START
+            //double alreadyVisitedWeight = weighting.calcWeight(iter, reverse, currEdge.edge) + currEdge.getWeightOfVisitedPath();
+            double alreadyVisitedWeight = weighting.calcWeight(iter, reverse, currEdge.originalEdge) + currEdge.getWeightOfVisitedPath();
+            // MARQ24 MOD END
+
             if (Double.isInfinite(alreadyVisitedWeight))
                 continue;
 
@@ -246,6 +247,12 @@ public class AStarBidirection extends AbstractBidirAlgo implements Recalculation
                 double estimationFullWeight = alreadyVisitedWeight + currWeightToGoal;
                 if (ase == null) {
                     ase = new AStarEntry(iter.getEdge(), neighborNode, estimationFullWeight, alreadyVisitedWeight);
+
+                    // MARQ24 MOD START
+                    // Modification by Maxim Rylov: assign originalEdge
+                    ase.originalEdge = iter.getOriginalEdge();
+                    // MARQ24 MOD END
+
                     bestWeightMap.put(traversalId, ase);
                 } else {
 //                    assert (ase.weight > 0.999999 * estimationFullWeight) : "Inconsistent distance estimate "
@@ -280,7 +287,7 @@ public class AStarBidirection extends AbstractBidirAlgo implements Recalculation
 
             // see DijkstraBidirectionRef
             if (entryOther.adjNode != entryCurrent.adjNode) {
-                entryCurrent = (AStar.AStarEntry) entryCurrent.parent;
+                entryCurrent = (AStarEntry) entryCurrent.parent;
                 newWeight -= weighting.calcWeight(edgeState, reverse, EdgeIterator.NO_EDGE);
             } else if (!traversalMode.hasUTurnSupport())
                 // we detected a u-turn at meeting point, skip if not supported

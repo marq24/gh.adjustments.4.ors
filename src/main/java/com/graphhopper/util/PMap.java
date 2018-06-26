@@ -155,9 +155,16 @@ public class PMap {
         return new HashMap<>(map);
     }
 
-    private Map<String, String> getMap() {
+    // MARQ24 made map Public !
+    //private Map<String, String> getMap() {
+    public Map<String, String> getMap() {
         return map;
     }
+    // MARQ24 MOD START
+    public int size() {
+        return map.size();
+    }
+    // MARQ24 MOD END
 
     public PMap merge(PMap read) {
         return merge(read.getMap());

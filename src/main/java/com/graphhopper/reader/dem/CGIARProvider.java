@@ -60,7 +60,10 @@ public class CGIARProvider implements ElevationProvider {
     private static final int WIDTH = 6000;
     final double precision = 1e7;
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final Map<String, HeightTile> cacheData = new HashMap<String, HeightTile>();
+    // MARQ24 MOD START
+    //private final Map<String, HeightTile> cacheData = new HashMap<String, HeightTile>();
+    private final Map<Integer, HeightTile> cacheData = new HashMap<Integer, HeightTile>();
+    // MARQ24 MOD END
     private final double invPrecision = 1 / precision;
     private final int degree = 5;
     private Downloader downloader = new Downloader("GraphHopper CGIARReader").setTimeout(10000);
@@ -155,7 +158,8 @@ public class CGIARProvider implements ElevationProvider {
         return this;
     }
 
-    @Override
+    // MARQ24 MOD START
+    /*@Override
     public double getEle(double lat, double lon) {
         // no data we can avoid the trouble
         if (lat > 60 || lat < -60)
@@ -271,6 +275,9 @@ public class CGIARProvider implements ElevationProvider {
 
         return demProvider.getHeight(lat, lon);
     }
+    */
+    //MARQ24 MOD END
+
 
     int down(double val) {
         // 'rounding' to closest 5
@@ -322,4 +329,160 @@ public class CGIARProvider implements ElevationProvider {
         logger.info(this.toString() + " Elevation Provider, from: " + baseUrl + ", to: " + cacheDir + ", as: " + daType);
         return dir = new GHDirectory(cacheDir.getAbsolutePath(), daType);
     }
+
+    // MARQ24 MOD START
+    public int getTileKey(double lat, double lon) {
+        lon = 1 + (180 + lon) / degree;
+        int lonInt = (int) lon;
+        lat = 1 + (60 - lat) / degree;
+        int latInt = (int) lat;
+
+        if (Math.abs(latInt - lat) < invPrecision / degree)
+            latInt--;
+
+        int hashCode = 23;
+        hashCode = 31 * hashCode + lonInt;
+        hashCode = 31 * hashCode + latInt;
+
+        return hashCode;
+    }
+
+    // Modification by Maxim Rylov
+    public HeightTile loadTile(double lat, double lon) {
+        //String name = getFileName(lat, lon);
+        int key = getTileKey(lat, lon);
+        HeightTile demProvider = cacheData.get(key);
+        if (demProvider == null) {
+            if (!cacheDir.exists())
+                cacheDir.mkdirs();
+
+            int minLat = down(lat);
+            int minLon = down(lon);
+            // less restrictive against boundary checking
+            demProvider = new HeightTile(minLat, minLon, WIDTH, degree * precision, degree);
+            demProvider.setCalcMean(calcMean);
+
+            cacheData.put(key, demProvider);
+            String name = getFileName(lat, lon);
+            DataAccess heights = getDirectory().find(name + ".gh");
+            demProvider.setHeights(heights);
+            boolean loadExisting = false;
+            try {
+                loadExisting = heights.loadExisting();
+            } catch (Exception ex) {
+                logger.warn("cannot load " + name + ", error:" + ex.getMessage());
+            }
+
+            if (!loadExisting) {
+                String tifName = name + ".tif";
+                String zippedURL = baseUrl + "/" + name + ".zip";
+                File file = new File(cacheDir, new File(zippedURL).getName());
+
+                // get zip file if not already in cacheDir - unzip later and in-memory only!
+                if (!file.exists()) {
+                    try {
+                        int max = 3;
+                        for (int trial = 0; trial < max; trial++) {
+                            try {
+                                downloader.downloadFile(zippedURL, file.getAbsolutePath());
+                                break;
+                            } catch (SocketTimeoutException ex) {
+                                // just try again after a little nap
+                                Thread.sleep(2000);
+                                if (trial >= max - 1)
+                                    throw ex;
+                                continue;
+                            } catch (IOException ex) {
+                                demProvider.setSeaLevel(true);
+                                // use small size on disc and in-memory
+                                heights.setSegmentSize(100).create(10).flush();
+                                return null;
+                            }
+                        }
+                    } catch (Exception ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+
+                // short == 2 bytes
+                heights.create(2 * WIDTH * WIDTH);
+
+                // logger.info("start decoding");
+                // decode tiff data
+                Raster raster;
+                SeekableStream ss = null;
+                try {
+                    InputStream is = new FileInputStream(file);
+                    ZipInputStream zis = new ZipInputStream(is);
+                    // find tif file in zip
+                    ZipEntry entry = zis.getNextEntry();
+                    while (entry != null && !entry.getName().equals(tifName)) {
+                        entry = zis.getNextEntry();
+                    }
+
+                    ss = SeekableStream.wrapInputStream(zis, true);
+                    TIFFImageDecoder imageDecoder = new TIFFImageDecoder(ss, new TIFFDecodeParam());
+                    raster = imageDecoder.decodeAsRaster();
+                } catch (Exception e) {
+                    throw new RuntimeException("Can't decode " + tifName, e);
+                } finally {
+                    if (ss != null)
+                        Helper.close(ss);
+                }
+
+                // logger.info("start converting to our format");
+                final int height = raster.getHeight();
+                final int width = raster.getWidth();
+                int x = 0, y = 0;
+                try {
+                    for (y = 0; y < height; y++) {
+                        for (x = 0; x < width; x++) {
+                            short val = (short) raster.getPixel(x, y, (int[]) null)[0];
+                            if (val < -1000 || val > 12000)
+                                val = Short.MIN_VALUE;
+
+                            heights.setShort(2 * (y * WIDTH + x), val);
+                        }
+                    }
+                    heights.flush();
+
+                    // TODO remove tifName and zip?
+                } catch (Exception ex) {
+                    throw new RuntimeException("Problem at x:" + x + ", y:" + y, ex);
+                }
+            } // loadExisting
+        }
+
+        return demProvider;
+    }
+    @Override
+    public HeightTile getTile(int key) {
+        HeightTile demProvider = cacheData.get(key);
+        return demProvider;
+    }
+
+    @Override
+    public double getEle(double lat, double lon) {
+        // no data we can avoid the trouble
+        if (lat > 60 || lat < -60)
+            return 0;
+
+        lat = (int) (lat * precision) / precision;
+        lon = (int) (lon * precision) / precision;
+
+        int key = getTileKey(lat, lon);
+        HeightTile demProvider = getTile(key);
+
+        if (demProvider == null)
+            demProvider = loadTile(lat, lon);
+
+        if (demProvider == null)
+            return 0;
+
+        if (demProvider.isSeaLevel())
+            return 0;
+
+        return demProvider.getHeight(lat, lon);
+    }
+    // MARQ24 MOD END
 }

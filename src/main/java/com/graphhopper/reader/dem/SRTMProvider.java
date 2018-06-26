@@ -197,6 +197,9 @@ public class SRTMProvider implements ElevationProvider {
         return str;
     }
 
+    //MARQ24 MOD START
+    // ORG CODE START
+    /*
     @Override
     public double getEle(double lat, double lon) {
         lat = (int) (lat * precision) / precision;
@@ -233,7 +236,23 @@ public class SRTMProvider implements ElevationProvider {
         demProvider.setCalcMean(calcMean);
         demProvider.setHeights(heights);
         return demProvider.getHeight(lat, lon);
+    }*/
+    // ORG CODE END
+    @Override
+    public double getEle(double lat, double lon) {
+        int key = getTileKey(lat, lon);
+
+        HeightTile demProvider = getTile(key);
+
+        if (demProvider == null)
+            demProvider = loadTile(lat, lon);
+
+        if (demProvider == null)
+            return 0;
+
+        return demProvider.getHeight(lat, lon);
     }
+    // MARQ24 MOD END
 
     private void updateHeightsFromZipFile(String fileDetails, DataAccess heights) throws RuntimeException {
         try {
@@ -306,5 +325,57 @@ public class SRTMProvider implements ElevationProvider {
 
         logger.info(this.toString() + " Elevation Provider, from: " + baseUrl + ", to: " + cacheDir + ", as: " + daType);
         return dir = new GHDirectory(cacheDir.getAbsolutePath(), daType);
+    }
+
+
+    //MARQ24 MOD START
+    // use int key instead of string for lower memory usage
+    public int getTileKey(double lat, double lon) {
+        // we could use LinearKeyAlgo but this is simpler as we only need integer precision:
+        return calcIntKey(lat, lon);
+    }
+
+    public HeightTile getTile(int key) {
+        HeightTile demProvider = cacheData.get(key);
+        return demProvider;
+    }
+
+    // Modification by Maxim Rylov
+    public HeightTile loadTile(double lat, double lon) {
+        lat = (int) (lat * precision) / precision;
+        lon = (int) (lon * precision) / precision;
+        int intKey = getTileKey(lat, lon);
+
+        HeightTile demProvider = cacheData.get(intKey);
+        if (demProvider != null)
+            return demProvider;
+        if (!cacheDir.exists())
+            cacheDir.mkdirs();
+
+        String fileDetails = getFileString(lat, lon);
+        if (fileDetails == null)
+            return null;
+
+        DataAccess heights = getDirectory().find("dem" + intKey);
+        boolean loadExisting = false;
+        try {
+            loadExisting = heights.loadExisting();
+        } catch (Exception ex) {
+            logger.warn("cannot load dem" + intKey + ", error:" + ex.getMessage());
+        }
+
+        if (!loadExisting)
+            updateHeightsFromZipFile(fileDetails, heights);
+
+        int width = (int) (Math.sqrt(heights.getHeader(WIDTH_BYTE_INDEX)) + 0.5);
+        if (width == 0)
+            width = DEFAULT_WIDTH;
+
+        demProvider = new HeightTile(down(lat), down(lon), width, precision, 1);
+        demProvider.setCalcMean(calcMean);
+        cacheData.put(intKey, demProvider);
+        demProvider.setHeights(heights);
+
+        return demProvider;
     }
 }

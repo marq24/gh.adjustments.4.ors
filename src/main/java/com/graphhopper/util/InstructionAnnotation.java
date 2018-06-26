@@ -26,19 +26,38 @@ public class InstructionAnnotation {
     private int importance;
     private String message;
 
+    // MARQ24 Modification by Maxim Rylov: Added a new class variable.
+    private int wayType;
+
     private InstructionAnnotation() {
         setEmpty();
     }
 
+    // MARQ24 MOD START
     public InstructionAnnotation(int importance, String message) {
+        this(importance, message, -1);
+    }
+    // MARQ24 MOD END
+
+    public InstructionAnnotation(int importance, String message, int wayType) {
         if (message.isEmpty() && importance == 0) {
             setEmpty();
         } else {
             this.empty = false;
             this.importance = importance;
             this.message = message;
+            // MARQ24 MOD START
+            this.wayType = wayType;
+            // MARQ24 MOD END
         }
     }
+
+    // MARQ24 MOD START
+    public int getWayType()
+    {
+        return wayType;
+    }
+    // MARQ24 MOD EMD
 
     private void setEmpty() {
         this.empty = true;

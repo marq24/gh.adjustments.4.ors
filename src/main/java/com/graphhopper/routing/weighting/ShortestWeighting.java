@@ -19,6 +19,7 @@ package com.graphhopper.routing.weighting;
 
 import com.graphhopper.routing.util.FlagEncoder;
 import com.graphhopper.util.EdgeIteratorState;
+import com.graphhopper.util.PMap;
 
 /**
  * Calculates the shortest route - independent of a vehicle as the calculation is based on the
@@ -31,6 +32,12 @@ public class ShortestWeighting extends AbstractWeighting {
     public ShortestWeighting(FlagEncoder flagEncoder) {
         super(flagEncoder);
     }
+
+    // MARQ24 MOD START
+    public ShortestWeighting(FlagEncoder flagEncoder, PMap map) {
+        super(flagEncoder, map);
+    }
+    // MARQ24 MOD END
 
     @Override
     public double getMinWeight(double currDistToGoal) {

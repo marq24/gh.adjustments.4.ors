@@ -69,6 +69,13 @@ class VirtualEdgeIterator implements EdgeIterator, CHEdgeIteratorState {
         return edges.get(current).getEdge();
     }
 
+    // MARQ24 MOD START
+    @Override
+    public int getOriginalEdge() {
+        return edges.get(current).getOriginalEdge();
+    }
+    // MARQ24 MOD END
+
     @Override
     public int getBaseNode() {
         return edges.get(current).getBaseNode();
