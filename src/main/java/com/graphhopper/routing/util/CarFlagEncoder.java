@@ -250,7 +250,7 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
 
             flags = setSpeed(flags, speed);
 
-            boolean isRoundabout = way.hasTag("junction", "roundabout");
+            boolean isRoundabout = way.hasTag("junction", "roundabout") || way.hasTag("junction", "circular");
             if (isRoundabout)
                 flags = setBool(flags, K_ROUNDABOUT, true);
 
@@ -264,7 +264,7 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
                 flags |= directionBitMask;
 
         } else {
-            double ferrySpeed = getFerrySpeed(way, defaultSpeedMap.get("living_street"), defaultSpeedMap.get("service"), defaultSpeedMap.get("residential"));
+            double ferrySpeed = getFerrySpeed(way);
             flags = setSpeed(flags, ferrySpeed);
             flags |= directionBitMask;
         }
@@ -272,7 +272,7 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
         for (String restriction : restrictions) {
             if (way.hasTag(restriction, "destination")) {
                 // This is problematic as Speed != Time
-                flags = this.speedEncoder.setDoubleValue(flags, destinationSpeed);
+                flags = setSpeed(flags, destinationSpeed);
             }
         }
 
@@ -335,8 +335,8 @@ public class CarFlagEncoder extends AbstractFlagEncoder {
     }
 
     /**
-     * @param way:   needed to retrieve tags
-     * @param speed: speed guessed e.g. from the road type or other tags
+     * @param way   needed to retrieve tags
+     * @param speed speed guessed e.g. from the road type or other tags
      * @return The assumed speed
      */
     protected double applyBadSurfaceSpeed(ReaderWay way, double speed) {

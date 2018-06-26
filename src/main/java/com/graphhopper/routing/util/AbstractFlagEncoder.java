@@ -83,6 +83,11 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     private boolean blockFords = true;
     private boolean registered;
 
+    // Speeds from CarFlagEncoder
+    protected static final double UNKNOWN_DURATION_FERRY_SPEED = 5;
+    protected static final double SHORT_TRIP_FERRY_SPEED = 20;
+    protected static final double LONG_TRIP_FERRY_SPEED = 30;
+
     private ConditionalTagInspector conditionalTagInspector;
 
     public AbstractFlagEncoder(PMap properties) {
@@ -438,8 +443,9 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     /**
      * Special handling for ferry ways.
      */
-    protected double getFerrySpeed(ReaderWay way, double unknownSpeed, double shortTripsSpeed, double longTripsSpeed) {
+    protected double getFerrySpeed(ReaderWay way) {
         long duration = 0;
+
         try {
             // During the reader process we have converted the duration value into a artificial tag called "duration:seconds".
             duration = Long.parseLong(way.getTag("duration:seconds"));
@@ -447,30 +453,27 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
         }
         // seconds to hours
         double durationInHours = duration / 60d / 60d;
+        // Check if our graphhopper specific artificially created estimated_distance way tag is present
+        Number estimatedLength = way.getTag("estimated_distance", null);
         if (durationInHours > 0)
             try {
-                // Check if our graphhopper specific artificially created estimated_distance way tag is present
-                Number estimatedLength = way.getTag("estimated_distance", null);
                 if (estimatedLength != null) {
-                    // to km
-                    double val = estimatedLength.doubleValue() / 1000;
+                    double estimatedLengthInKm = estimatedLength.doubleValue() / 1000;
                     // If duration AND distance is available we can calculate the speed more precisely
                     // and set both speed to the same value. Factor 1.4 slower because of waiting time!
-                    double calculatedTripSpeed = val / durationInHours / 1.4;
+                    double calculatedTripSpeed = estimatedLengthInKm / durationInHours / 1.4;
                     // Plausibility check especially for the case of wrongly used PxM format with the intention to
                     // specify the duration in minutes, but actually using months
                     if (calculatedTripSpeed > 0.01d) {
-                        // If we have a very short ferry with an average lower compared to what we can encode 
-                        // then we need to avoid setting it as otherwise the edge would not be found at all any more.
-                        if (Math.round(calculatedTripSpeed) > speedEncoder.factor / 2) {
-                            shortTripsSpeed = Math.round(calculatedTripSpeed);
-                            if (shortTripsSpeed > getMaxSpeed())
-                                shortTripsSpeed = getMaxSpeed();
-                            longTripsSpeed = shortTripsSpeed;
-                        } else {
-                            // Now we set to the lowest possible still accessible speed. 
-                            shortTripsSpeed = speedEncoder.factor / 2;
+                        if (calculatedTripSpeed > getMaxSpeed()) {
+                            return getMaxSpeed();
                         }
+                        // If the speed is lower than the speed we can store, we have to set it to the minSpeed, but > 0
+                        if (Math.round(calculatedTripSpeed) < speedEncoder.factor / 2) {
+                            return speedEncoder.factor / 2;
+                        }
+
+                        return Math.round(calculatedTripSpeed);
                     } else {
                         long lastId = way.getNodes().isEmpty() ? -1 : way.getNodes().get(way.getNodes().size() - 1);
                         long firstId = way.getNodes().isEmpty() ? -1 : way.getNodes().get(0);
@@ -484,13 +487,15 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
             }
 
         if (durationInHours == 0) {
+            if(estimatedLength != null && estimatedLength.doubleValue() <= 300)
+                return speedEncoder.factor / 2;
             // unknown speed -> put penalty on ferry transport
-            return unknownSpeed;
+            return UNKNOWN_DURATION_FERRY_SPEED;
         } else if (durationInHours > 1) {
             // lengthy ferries should be faster than short trip ferry
-            return longTripsSpeed;
+            return LONG_TRIP_FERRY_SPEED;
         } else {
-            return shortTripsSpeed;
+            return SHORT_TRIP_FERRY_SPEED;
         }
     }
 
@@ -671,8 +676,8 @@ public abstract class AbstractFlagEncoder implements FlagEncoder, TurnCostEncode
     }
 
     /**
-     * @param way:   needed to retrieve tags
-     * @param speed: speed guessed e.g. from the road type or other tags
+     * @param way   needed to retrieve tags
+     * @param speed speed guessed e.g. from the road type or other tags
      * @return The assumed speed.
      */
     protected double applyMaxSpeed(ReaderWay way, double speed) {

@@ -58,7 +58,7 @@ public abstract class ReaderElement {
             return "<empty>";
 
         StringBuilder tagTxt = new StringBuilder();
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+        for (Entry<String, Object> entry : properties.entrySet()) {
             tagTxt.append(entry.getKey());
             tagTxt.append("=");
             tagTxt.append(entry.getValue());
