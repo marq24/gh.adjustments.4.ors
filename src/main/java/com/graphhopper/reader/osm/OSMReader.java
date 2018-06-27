@@ -1,14 +1,14 @@
 /*
  *  Licensed to GraphHopper GmbH under one or more contributor
- *  license agreements. See the NOTICE file distributed with this work for 
+ *  license agreements. See the NOTICE file distributed with this work for
  *  additional information regarding copyright ownership.
- * 
- *  GraphHopper GmbH licenses this file to you under the Apache License, 
- *  Version 2.0 (the "License"); you may not use this file except in 
+ *
+ *  GraphHopper GmbH licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except in
  *  compliance with the License. You may obtain a copy of the License at
- * 
+ *
  *       http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -465,7 +465,7 @@ public class OSMReader implements DataReader {
                         if (lastBarrier < 0)
                             lastBarrier = 0;
 
-                        // add way up to barrier shadow node                        
+                        // add way up to barrier shadow node
                         int length = i - lastBarrier + 1;
                         LongArrayList partNodeIds = new LongArrayList();
                         partNodeIds.add(osmNodeIds.buffer, lastBarrier, length);
@@ -497,10 +497,10 @@ public class OSMReader implements DataReader {
         } else {
             // MARQ24 MOD START
             if (!onCreateEdges(way, osmNodeIds, wayFlags, createdEdges)) {
-            // MARQ24 MOD END
+                // MARQ24 MOD END
                 // no barriers - simply add the whole way
                 createdEdges.addAll(addOSMWay(way.getNodes(), wayFlags, wayOsmId));
-            // MARQ24 MOD START
+                // MARQ24 MOD START
             }
             // MARQ24 MOD END
         }
@@ -823,14 +823,14 @@ public class OSMReader implements DataReader {
                 if (!distCalc.isCrossBoundary(lon, prevLon))
                     // MARQ24 MOD START
                     if(calcDistance3D) {
-                    // MARQ24 MOD END
-                    towerNodeDistance += distCalc3D.calcDist(prevLat, prevLon, prevEle, lat, lon, ele);
-                    // MARQ24 MOD START
+                        // MARQ24 MOD END
+                        towerNodeDistance += distCalc3D.calcDist(prevLat, prevLon, prevEle, lat, lon, ele);
+                        // MARQ24 MOD START
                     } else {
-                    // MARQ24 MOD START
+                        // MARQ24 MOD START
                         towerNodeDistance += distCalc.calcDist(prevLat, prevLon, lat, lon);
                     }
-                    // MARQ24 MOD END
+                // MARQ24 MOD END
                 prevEle = ele;
             } else if (!distCalc.isCrossBoundary(lon, prevLon))
                 towerNodeDistance += distCalc.calcDist(prevLat, prevLon, lat, lon);
@@ -845,7 +845,7 @@ public class OSMReader implements DataReader {
             }
         }
         if (towerNodeDistance < 0.0001) {
-            // As investigation shows often two paths should have crossed via one identical point 
+            // As investigation shows often two paths should have crossed via one identical point
             // but end up in two very close points.
             zeroCounter++;
             towerNodeDistance = 0.0001;
@@ -858,7 +858,7 @@ public class OSMReader implements DataReader {
         }
 
         if (Double.isInfinite(towerNodeDistance) || towerNodeDistance > maxDistance) {
-            // Too large is very rare and often the wrong tagging. See #435 
+            // Too large is very rare and often the wrong tagging. See #435
             // so we can avoid the complexity of splitting the way for now (new towernodes would be required, splitting up geometry etc)
             LOGGER.warn("Bug in OSM or GraphHopper. Too big tower node distance " + towerNodeDistance + " reset to large value, osm way " + wayOsmId);
             towerNodeDistance = maxDistance;
@@ -934,7 +934,12 @@ public class OSMReader implements DataReader {
     protected void finishedReading() {
         printInfo("way");
         pillarInfo.clear();
-        eleProvider.release();
+        // MARQ24 MOD START
+        // MARQ24: DO NOT CLEAR THE CACHE of the ELEVATION PROVIDERS - since the data will be reused
+        // the provider data will be cleared only after the last VehicleProfile have completed
+        // the work...
+        //eleProvider.release();
+        // MARQ24 MOD END
         osmNodeIdToInternalNodeMap = null;
         osmNodeIdToNodeFlagsMap = null;
         osmWayIdToRouteWeightMap = null;
@@ -1016,7 +1021,7 @@ public class OSMReader implements DataReader {
     // MARQ24 MOD START
     //boolean isInBounds(ReaderNode node) {
     protected boolean isInBounds(ReaderNode node) {
-    // MARQ24 MOD END
+        // MARQ24 MOD END
         return true;
     }
 
@@ -1026,7 +1031,7 @@ public class OSMReader implements DataReader {
     // MARQ24 MOD START
     //protected LongIntMap getNodeMap() {
     public LongIntMap getNodeMap() {
-    // MARQ24 MOD END
+        // MARQ24 MOD END
         return osmNodeIdToInternalNodeMap;
     }
 
