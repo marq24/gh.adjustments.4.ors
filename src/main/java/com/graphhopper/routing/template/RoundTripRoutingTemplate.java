@@ -33,7 +33,6 @@ import com.graphhopper.util.Helper;
 import com.graphhopper.util.Parameters.Algorithms;
 import com.graphhopper.util.Parameters.Algorithms.RoundTrip;
 import com.graphhopper.util.PathMerger;
-import com.graphhopper.util.Translation;
 import com.graphhopper.util.exceptions.PointNotFoundException;
 import com.graphhopper.util.shapes.GHPoint;
 
@@ -65,10 +64,10 @@ public class RoundTripRoutingTemplate extends AbstractRoutingTemplate implements
     }
 
     @Override
-    // MARQ24 MOD START
+    // ORS-GH MOD START
     //public List<QueryResult> lookup(List<GHPoint> points, FlagEncoder encoder) {
     public List<QueryResult> lookup(List<GHPoint> points, double[] distances, FlagEncoder encoder) {
-        // MARQ24 MOD END
+        // ORS-GH MOD END
         if (points.size() != 1 || ghRequest.getPoints().size() != 1)
             throw new IllegalArgumentException("For round trip calculation exactly one point is required");
 
@@ -150,18 +149,18 @@ public class RoundTripRoutingTemplate extends AbstractRoutingTemplate implements
     }
 
     @Override
-    // MARQ24 MOD START
+    // ORS-GH MOD START
     //public boolean isReady(PathMerger pathMerger, Translation tr) {
     public boolean isReady(PathMerger pathMerger, PathProcessingContext pathProcCntx) {
-    // MARQ24 MOD END
+    // ORS-GH MOD END
         altResponse = new PathWrapper();
         altResponse.setWaypoints(getWaypoints());
         ghResponse.add(altResponse);
 
-        // MARQ24 MOD START
+        // ORS-GH MOD START
         //pathMerger.doWork(altResponse, pathList, tr);
         pathMerger.doWork(altResponse, pathList, pathProcCntx);
-        // MARQ24 MOD END
+        // ORS-GH MOD END
 
         // with potentially retrying, including generating new route points, for now disabled
         return true;
