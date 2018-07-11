@@ -79,7 +79,7 @@ public class VirtualEdgeIteratorState implements EdgeIteratorState, CHEdgeIterat
     }
 
     // ORS-GH MOD START
-    @Override
+    //@Override
     public int getOriginalEdge() {
         return originalEdgeId;
     }
